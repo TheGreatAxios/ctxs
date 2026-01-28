@@ -12,6 +12,9 @@ library LimitOrderStructs {
         uint256 deadline; /// Expiration timestamp (0 = no expiry)
         uint256 nonce; /// User-specific nonce for order identification
         bool active; /// Order status flag
+        bool gasDeducted; /// Track if gas was deducted (prevent double-spend on cancel)
+        bytes32 orderHash; /// Hash of signed intent for verification
+        bytes signature; /// Compact vrs signature for fillLimitOrder authorization
     }
 
     /// @notice Price condition check result

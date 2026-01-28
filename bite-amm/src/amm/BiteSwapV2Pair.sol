@@ -15,6 +15,10 @@ contract BiteSwapV2Pair is IBiteSwapV2Pair, ERC20, ReentrancyGuard {
     error NotFactory();
     error AlreadyInitialized();
     error Overflow();
+    error InvalidSignature();
+    error SignerMismatch();
+    error InvalidAmount();
+    error SlippageExceeded();
 
     event Mint(address indexed sender, uint256 amount0, uint256 amount1);
     event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
@@ -25,6 +29,9 @@ contract BiteSwapV2Pair is IBiteSwapV2Pair, ERC20, ReentrancyGuard {
         uint256 amount0Out,
         uint256 amount1Out,
         address indexed to
+    );
+    event LimitOrderFilled(
+        address indexed signer, uint256 amount0In, uint256 amount1In, uint256 amount0Out, uint256 amount1Out
     );
     event Sync(uint112 reserve0, uint112 reserve1);
     event SwapHookCalled(address indexed pair);
@@ -43,6 +50,7 @@ contract BiteSwapV2Pair is IBiteSwapV2Pair, ERC20, ReentrancyGuard {
     uint256 public price1CumulativeLast;
 
     bool private locked;
+    mapping(address => uint256) public nonces;
 
     modifier lock() {
         if (locked) revert("Reentrancy: swap in progress");
@@ -218,6 +226,103 @@ contract BiteSwapV2Pair is IBiteSwapV2Pair, ERC20, ReentrancyGuard {
         _checkLimitOrders();
     }
 
+    /// @notice Execute a swap with signed authorization from user (limit order fill)
+    /// @dev Verifies signature, pulls tokens from signer, executes swap
+    /// @param amount0Out Amount of token0 to receive
+    /// @param amount1Out Amount of token1 to receive
+    /// @param to Recipient address (must match signer for security)
+    /// @param amountInMax Maximum input amount to pull from signer
+    /// @param nonce Custom nonce for signature verification (from order)
+    /// @param v Signature v component
+    /// @param r Signature r component
+    /// @param s Signature s component
+    /// @return amountIn Actual input amount pulled from signer
+    function fillLimitOrder(
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to,
+        uint256 amountInMax,
+        uint256 nonce,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external lock nonReentrant returns (uint256 amountIn) {
+        if (amount0Out == 0 && amount1Out == 0) revert InsufficientOutputAmount();
+        if (to == token0 || to == token1) revert InvalidTo();
+
+        // Verify signature
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n32",
+                keccak256(abi.encode(address(this), amount0Out, amount1Out, to, amountInMax, nonce))
+            )
+        );
+        address signer = ecrecover(digest, v, r, s);
+        if (signer == address(0)) revert InvalidSignature();
+        if (signer != to) revert SignerMismatch();
+
+        amountIn = _fillLimitOrderInternal(amount0Out, amount1Out, to, amountInMax, signer);
+    }
+
+    /// @notice Internal fillLimitOrder logic (separate to reduce stack depth)
+    function _fillLimitOrderInternal(
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to,
+        uint256 amountInMax,
+        address signer
+    ) internal returns (uint256 amountIn) {
+        (uint112 _reserve0, uint112 _reserve1,) = getReserves();
+        if (_reserve0 <= amount0Out || _reserve1 <= amount1Out) revert InsufficientLiquidity();
+
+        // Transfer output tokens
+        if (amount0Out > 0) _safeTransfer(token0, to, amount0Out);
+        if (amount1Out > 0) _safeTransfer(token1, to, amount1Out);
+
+        // Get balances after output transfer
+        uint256 balance0 = IERC20(token0).balanceOf(address(this));
+        uint256 balance1 = IERC20(token1).balanceOf(address(this));
+
+        // Calculate input amounts
+        uint256 amount0In = balance0 > _reserve0 - amount0Out ? balance0 - (_reserve0 - amount0Out) : 0;
+        uint256 amount1In = balance1 > _reserve1 - amount1Out ? balance1 - (_reserve1 - amount1Out) : 0;
+
+        if (amount0In == 0 && amount1In == 0) revert InsufficientInputAmount();
+        amountIn = amount0In + amount1In;
+        if (amountIn == 0) revert InvalidAmount();
+        if (amountIn > amountInMax) revert SlippageExceeded();
+
+        // Pull input tokens
+        if (amount0In > 0) _safeTransferFrom(token0, signer, address(this), amount0In);
+        if (amount1In > 0) _safeTransferFrom(token1, signer, address(this), amount1In);
+
+        // Verify k constraint
+        {
+            uint256 balance0Final = IERC20(token0).balanceOf(address(this));
+            uint256 balance1Final = IERC20(token1).balanceOf(address(this));
+            uint256 balance0Adjusted = (balance0Final * 1000) - (amount0In * 3);
+            uint256 balance1Adjusted = (balance1Final * 1000) - (amount1In * 3);
+            if (balance0Adjusted * balance1Adjusted < uint256(_reserve0) * uint256(_reserve1) * 1000000) revert K();
+        }
+
+        _update(balance0 + amount0In, balance1 + amount1In);
+        _emitLimitOrderEvents(signer, amount0In, amount1In, amount0Out, amount1Out, to);
+        _checkLimitOrders();
+    }
+
+    /// @notice Emit events for limit order fill (separate to reduce stack depth)
+    function _emitLimitOrderEvents(
+        address signer,
+        uint256 amount0In,
+        uint256 amount1In,
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to
+    ) internal {
+        emit Swap(signer, amount0In, amount1In, amount0Out, amount1Out, to);
+        emit LimitOrderFilled(signer, amount0In, amount1In, amount0Out, amount1Out);
+    }
+
     /// @notice Swap hook callback - triggers limit order check
     /// @dev Called after swap completes internally
     /// @dev Failures in checkOrders should not revert the swap
@@ -241,6 +346,12 @@ contract BiteSwapV2Pair is IBiteSwapV2Pair, ERC20, ReentrancyGuard {
     function _safeTransfer(address token, address to, uint256 value) private {
         (bool success, bytes memory data) = token.call(abi.encodeWithSignature("transfer(address,uint256)", to, value));
         if (!success || (data.length > 0 && !abi.decode(data, (bool)))) revert("Transfer failed");
+    }
+
+    function _safeTransferFrom(address token, address from, address to, uint256 value) private {
+        (bool success, bytes memory data) =
+            token.call(abi.encodeWithSignature("transferFrom(address,address,uint256)", from, to, value));
+        if (!success || (data.length > 0 && !abi.decode(data, (bool)))) revert("TransferFrom failed");
     }
 
     function min(uint256 a, uint256 b) private pure returns (uint256) {

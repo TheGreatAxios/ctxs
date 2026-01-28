@@ -29,15 +29,16 @@ contract AddLiquidityAndSwap is Script {
 
         // Add liquidity via router
         console.log("Adding liquidity...");
-        IBiteSwapV2Router(ROUTER).addLiquidity(
-            USDC,
-            WETH,
-            1_000_000 * 10 ** 6,  // 1M USDC
-            500 * 10 ** 18,         // 500 WETH
-            0,
-            0,
-            RECIPIENT
-        );
+        IBiteSwapV2Router(ROUTER)
+            .addLiquidity(
+                USDC,
+                WETH,
+                1_000_000 * 10 ** 6, // 1M USDC
+                500 * 10 ** 18, // 500 WETH
+                0,
+                0,
+                RECIPIENT
+            );
 
         // Swap
         address[] memory path = new address[](2);
@@ -45,12 +46,7 @@ contract AddLiquidityAndSwap is Script {
         path[1] = WETH;
 
         console.log("Swapping 1000 USDC -> WETH...");
-        uint256 amountOut = IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(
-            1000 * 10 ** 6,
-            0,
-            path,
-            RECIPIENT
-        );
+        uint256 amountOut = IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(1000 * 10 ** 6, 0, path, RECIPIENT);
 
         console.log("Received WETH:", amountOut);
 

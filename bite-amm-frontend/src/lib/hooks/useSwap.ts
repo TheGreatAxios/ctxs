@@ -1,13 +1,17 @@
-import { useWriteContract, usePublicClient, useAccount } from "wagmi";
+import { useWriteContract, usePublicClient, useAccount, useSendTransaction } from "wagmi";
 import type { Address } from "viem";
 import {
   BaseError,
   ContractFunctionRevertedError,
   decodeErrorResult,
+  encodeFunctionData,
+  toBytes,
 } from "viem";
 import { useState, useEffect } from "react";
 import { useTxReceipt } from "./useTxReceipt";
 import BiteSwapV2RouterABI from "../../../abi/BiteSwapV2Router.json";
+import { BITE } from "@skalenetwork/bite";
+import { skaleTestnetChain } from "@/wagmi";
 
 const ROUTER_ABI = BiteSwapV2RouterABI.abi;
 
@@ -35,6 +39,7 @@ export interface SwapParams {
   amountIn: bigint;
   amountOutMin: bigint;
   recipient: Address;
+  useEncryption?: boolean;
 }
 
 /**
@@ -52,6 +57,7 @@ export function useSwap() {
     data: writeData,
     error: writeError,
   } = useWriteContract();
+  const { sendTransaction, data: sendTxData, error: sendTxError } = useSendTransaction();
   const publicClient = usePublicClient();
 
   const { data: receipt, isLoading: isConfirming } = useTxReceipt({
@@ -68,6 +74,14 @@ export function useSwap() {
     }
   }, [writeData]);
 
+  // Watch sendTxData for hash as fallback (encrypted transactions)
+  useEffect(() => {
+    if (sendTxData && sendTxData !== activeHash) {
+      console.log("sendTxData updated, setting activeHash:", sendTxData);
+      setActiveHash(sendTxData);
+    }
+  }, [sendTxData, activeHash]);
+
   // Watch writeError for immediate errors
   useEffect(() => {
     if (writeError) {
@@ -79,6 +93,18 @@ export function useSwap() {
       setError(message);
     }
   }, [writeError]);
+
+  // Watch sendTxError for immediate errors (encrypted transactions)
+  useEffect(() => {
+    if (sendTxError) {
+      console.error("sendTransaction error:", sendTxError);
+      const message =
+        sendTxError instanceof BaseError
+          ? sendTxError.shortMessage || sendTxError.message
+          : "Encrypted swap preparation failed";
+      setError(message);
+    }
+  }, [sendTxError]);
 
   // Manual receipt check as backup for networks where useWaitForTransactionReceipt might fail
   useEffect(() => {
@@ -121,39 +147,81 @@ export function useSwap() {
     setError(null);
     setActiveRouter(params.routerAddress);
 
-    console.log("Initiating swap:", { params, path });
+    console.log("Initiating swap:", { ...params, useEncryption: params.useEncryption ?? false });
 
     try {
-      // Call router.swapExactTokensForTokens
-      // Note: This Router ABI doesn't include deadline parameter
-      writeContract(
-        {
-          address: params.routerAddress,
+      if (params.useEncryption) {
+        // === BITE Phase 1: Encrypted Transaction ===
+        // Encode the swap calldata
+        const encodedCalldata = encodeFunctionData({
           abi: ROUTER_ABI,
           functionName: "swapExactTokensForTokens",
           args: [params.amountIn, params.amountOutMin, path, params.recipient],
-          // SKALE requires explicit gas settings
-          gas: 25_000_000n,
-          maxFeePerGas: 500_000_000n, // 0.5 gwei
-          maxPriorityFeePerGas: 500_000_000n, // 0.5 gwei
-        },
-        {
-          onSuccess: (hash) => {
-            console.log("Swap onSuccess - setting hash:", hash);
-            setActiveHash(hash);
+        });
+
+        // Create transaction object for BITE encryption
+        const transaction = {
+          to: params.routerAddress,
+          data: encodedCalldata,
+          value: 0n,
+        };
+
+        // Encrypt the transaction using BITE Phase 1
+        const rpcUrl = skaleTestnetChain.rpcUrls.public.http[0];
+        const bite = new BITE(rpcUrl);
+        const encryptedTx = await bite.encryptTransaction(transaction);
+
+        console.log("BITE Phase 1 Encryption:", {
+          originalTo: params.routerAddress,
+          magicTo: encryptedTx.to,
+          originalData: encodedCalldata,
+          encryptedData: encryptedTx.data,
+        });
+
+        // Send encrypted transaction to magic number
+        sendTransaction(
+          {
+            to: encryptedTx.to as Address,
+            data: encryptedTx.data as `0x${string}`,
+            gas: 25_000_000n,
           },
-          onError: (err) => {
-            console.error("Swap onError:", err);
-            const message =
-              err instanceof BaseError
-                ? err.shortMessage || err.message
-                : "Swap failed";
-            setError(message);
+          {
+            onSuccess: (hash) => {
+              console.log("Encrypted swap sent - hash:", hash);
+              setActiveHash(hash);
+            },
           },
-        },
-      );
+        );
+      } else {
+        // === Standard Transaction ===
+        writeContract(
+          {
+            address: params.routerAddress,
+            abi: ROUTER_ABI,
+            functionName: "swapExactTokensForTokens",
+            args: [params.amountIn, params.amountOutMin, path, params.recipient],
+            gas: 25_000_000n,
+            maxFeePerGas: 500_000_000n,
+            maxPriorityFeePerGas: 500_000_000n,
+          },
+          {
+            onSuccess: (hash) => {
+              console.log("Standard swap sent - hash:", hash);
+              setActiveHash(hash);
+            },
+            onError: (err) => {
+              console.error("Swap onError:", err);
+              const message =
+                err instanceof BaseError
+                  ? err.shortMessage || err.message
+                  : "Swap failed";
+              setError(message);
+            },
+          },
+        );
+      }
     } catch (err) {
-      console.error("Swap sync error:", err);
+      console.error("Swap error:", err);
       const message =
         err instanceof BaseError
           ? err.shortMessage || err.message

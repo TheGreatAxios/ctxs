@@ -32,12 +32,7 @@ contract SwapNewDeploy is Script {
         path[0] = USDC;
         path[1] = WETH;
 
-        IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(
-            1000 * 10 ** 6,
-            0,
-            path,
-            RECIPIENT
-        );
+        IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(1000 * 10 ** 6, 0, path, RECIPIENT);
 
         vm.stopBroadcast();
     }

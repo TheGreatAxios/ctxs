@@ -24,12 +24,7 @@ contract ApproveAndSwap is Script {
         path[1] = WETH;
 
         console.log("Swapping 1000 USDC -> WETH...");
-        IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(
-            1000 * 10 ** 6,
-            0,
-            path,
-            RECIPIENT
-        );
+        IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(1000 * 10 ** 6, 0, path, RECIPIENT);
 
         vm.stopBroadcast();
     }

@@ -43,12 +43,7 @@ contract CreatePairAndSwap is Script {
         uint256 amountOutMin = 0;
 
         console.log("Executing swap...");
-        IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(
-            amountIn,
-            amountOutMin,
-            path,
-            RECIPIENT
-        );
+        IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(amountIn, amountOutMin, path, RECIPIENT);
 
         vm.stopBroadcast();
     }

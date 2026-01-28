@@ -20,7 +20,9 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     error NotFactory();
     error InvalidOrderData();
     error OrderNotFound();
+    error InvalidSignature();
     error TransferFailed();
+    error InvalidAmount();
     error SwapExecutionFailed(uint256 orderId, bytes reason);
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -96,22 +98,25 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     // ═════════════════════════════════════════════════════════════════════════
     // Order Management
     // ═════════════════════════════════════════════════════════════════════════
-    /// @notice Submit an encrypted limit order
+    /// @notice Submit an encrypted limit order with signed authorization
     /// @param pool AMM pair address
     /// @param encryptedTargetPrice Threshold-encrypted target price
     /// @param encryptedAmount Threshold-encrypted amount
     /// @param direction true = token0→token1, false = token1→token0
     /// @param deadline Expiration timestamp (0 = no expiry)
+    /// @param signature Compact vrs signature (bytes65) for authorization
     /// @return orderId Order ID in the pool's order array
     function submitLimitOrder(
         address pool,
         bytes calldata encryptedTargetPrice,
         bytes calldata encryptedAmount,
         bool direction,
-        uint256 deadline
+        uint256 deadline,
+        bytes calldata signature
     ) external payable nonReentrant returns (uint256 orderId) {
         if (msg.value < CTX_GAS_COST) revert InsufficientGasPayment();
         if (!_isValidPool(pool)) revert InvalidPool();
+        if (signature.length != 65) revert InvalidSignature();
 
         // Store gas deposit
         userGasBalance[msg.sender] += msg.value;
@@ -119,6 +124,9 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
         // Create and store order
         uint256 nonce = ++userNonces[msg.sender];
         orderId = poolOrders[pool].length;
+
+        // Create order hash for signature verification (will be used later)
+        bytes32 orderHash = keccak256(abi.encode(pool, msg.sender, nonce));
 
         poolOrders[pool].push(
             LimitOrderStructs.LimitOrder({
@@ -129,14 +137,17 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
                 direction: direction,
                 deadline: deadline,
                 nonce: nonce,
-                active: true
+                active: true,
+                gasDeducted: false,
+                orderHash: orderHash,
+                signature: signature
             })
         );
 
         emit OrderSubmitted(msg.sender, pool, orderId, nonce);
     }
 
-    /// @notice Cancel an active order and refund gas deposit
+    /// @notice Cancel an active order and refund gas deposit (if not yet used)
     /// @param pool Pool address
     /// @param orderId Order ID
     function cancelOrder(address pool, uint256 orderId) external nonReentrant {
@@ -145,8 +156,13 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
         if (!order.active) revert OrderInactive();
 
         order.active = false;
-        uint256 refund = CTX_GAS_COST;
-        userGasBalance[msg.sender] += refund;
+
+        // Only refund gas if it hasn't been deducted yet (prevent double-spend)
+        if (!order.gasDeducted) {
+            uint256 refund = CTX_GAS_COST;
+            userGasBalance[msg.sender] += refund;
+        }
+
         emit OrderCancelled(msg.sender, pool, orderId);
     }
 
@@ -220,11 +236,13 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
 
             // Deduct gas only after successful CTX submission
             userGasBalance[order.maker] -= gasCost;
+            order.gasDeducted = true;
 
             (bool success,) = payable(ctxSender).call{value: gasCost}("");
             if (!success) {
                 // Refund gas if ETH transfer fails
                 userGasBalance[order.maker] += gasCost;
+                order.gasDeducted = false;
                 revert TransferFailed();
             }
 
@@ -277,7 +295,7 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
 
         if (met) {
             // Attempt swap with safe error handling - use calculated output amount
-            (bool success, bytes memory errorData) = _executeSwap(pool, outputAmount, direction, order.maker);
+            (bool success, bytes memory errorData) = _executeSwap(pool, order, outputAmount, direction);
 
             if (success) {
                 // Swap succeeded - mark order as filled
@@ -338,21 +356,38 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
         amountOut = numerator / denominator;
     }
 
-    /// @notice Execute swap on the pool
+    /// @notice Execute swap on the pool using fillLimitOrder with stored signature
     /// @dev Uses try/catch to prevent reverts from bubbling up
     /// @param pool Pool address
-    /// @param amount Input amount
+    /// @param order Order to execute (contains signature)
+    /// @param outputAmount Expected output amount
     /// @param direction Swap direction
-    /// @param maker Recipient
     /// @return success True if swap succeeded
     /// @return errorData Error data if swap failed
-    function _executeSwap(address pool, uint256 amount, bool direction, address maker)
+    function _executeSwap(address pool, LimitOrderStructs.LimitOrder memory order, uint256 outputAmount, bool direction)
         internal
         returns (bool success, bytes memory errorData)
     {
+        if (outputAmount == 0) revert InvalidAmount();
+        if (order.signature.length != 65) revert InvalidSignature();
+
+        // Decode signature from bytes
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        bytes memory sig = order.signature;
+        assembly {
+            r := mload(add(sig, 32))
+            s := mload(add(sig, 64))
+            v := byte(0, mload(add(sig, 96)))
+        }
+
+        // Calculate input amount with some buffer (actual input will be calculated by pair)
+        uint256 amountInMax = _getAmountIn(outputAmount, pool, direction);
+
         if (direction) {
             // token0 → token1: receive token1
-            try IBiteSwapV2Pair(pool).swap(0, amount, maker, "") {
+            try IBiteSwapV2Pair(pool).fillLimitOrder(0, outputAmount, order.maker, amountInMax, order.nonce, v, r, s) {
                 return (true, "");
             } catch Error(string memory reason) {
                 return (false, bytes(reason));
@@ -361,7 +396,7 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
             }
         } else {
             // token1 → token0: receive token0
-            try IBiteSwapV2Pair(pool).swap(amount, 0, maker, "") {
+            try IBiteSwapV2Pair(pool).fillLimitOrder(outputAmount, 0, order.maker, amountInMax, order.nonce, v, r, s) {
                 return (true, "");
             } catch Error(string memory reason) {
                 return (false, bytes(reason));
@@ -369,6 +404,33 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
                 return (false, lowLevelData);
             }
         }
+    }
+
+    /// @notice Calculate input amount needed for desired output (reverse of getAmountOut)
+    /// @param amountOut Desired output amount
+    /// @param pool Pool address
+    /// @param direction Swap direction
+    /// @return amountIn Maximum input amount (with buffer)
+    function _getAmountIn(uint256 amountOut, address pool, bool direction) internal view returns (uint256 amountIn) {
+        (uint112 reserve0, uint112 reserve1,) = IBiteSwapV2Pair(pool).getReserves();
+
+        uint256 reserveIn;
+        uint256 reserveOut;
+
+        if (direction) {
+            // token0 → token1: receiving token1, need token0
+            reserveIn = reserve0;
+            reserveOut = reserve1;
+        } else {
+            // token1 → token0: receiving token0, need token1
+            reserveIn = reserve1;
+            reserveOut = reserve0;
+        }
+
+        // Reverse formula: amountIn = (amountOut * reserveIn * 1000) / ((reserveOut - amountOut) * 997)
+        // Add 10% buffer for slippage
+        amountIn = (amountOut * reserveIn * 1000) / ((reserveOut - amountOut) * 997);
+        amountIn = (amountIn * 110) / 100; // 10% buffer
     }
 
     /// @notice Verify address is a valid pool from our factory

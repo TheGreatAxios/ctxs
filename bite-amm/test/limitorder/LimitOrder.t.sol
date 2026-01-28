@@ -67,6 +67,7 @@ contract LimitOrderTest is Test {
         // Mock encrypted data (would use bite-ts in production)
         bytes memory encryptedPrice = abi.encode(100 * 10 ** 18);
         bytes memory encryptedAmount = abi.encode(10 * 10 ** 18);
+        bytes memory signature = _generateMockSignature();
 
         vm.startPrank(bob);
         lob.submitLimitOrder{value: 0.01 ether}(
@@ -74,7 +75,8 @@ contract LimitOrderTest is Test {
             encryptedPrice,
             encryptedAmount,
             true, // token0 -> token1
-            0 // no deadline
+            0, // no deadline
+            signature
         );
         vm.stopPrank();
 
@@ -85,18 +87,20 @@ contract LimitOrderTest is Test {
     function testSubmitLimitOrderInsufficientGas() public {
         bytes memory encryptedPrice = abi.encode(100 * 10 ** 18);
         bytes memory encryptedAmount = abi.encode(10 * 10 ** 18);
+        bytes memory signature = _generateMockSignature();
 
         vm.prank(bob);
         vm.expectRevert(ConfidentialLimitOrderBook.InsufficientGasPayment.selector);
-        lob.submitLimitOrder{value: 0.001 ether}(address(pair), encryptedPrice, encryptedAmount, true, 0);
+        lob.submitLimitOrder{value: 0.001 ether}(address(pair), encryptedPrice, encryptedAmount, true, 0, signature);
     }
 
     function testCancelOrder() public {
         bytes memory encryptedPrice = abi.encode(100 * 10 ** 18);
         bytes memory encryptedAmount = abi.encode(10 * 10 ** 18);
+        bytes memory signature = _generateMockSignature();
 
         vm.startPrank(bob);
-        lob.submitLimitOrder{value: 0.01 ether}(address(pair), encryptedPrice, encryptedAmount, true, 0);
+        lob.submitLimitOrder{value: 0.01 ether}(address(pair), encryptedPrice, encryptedAmount, true, 0, signature);
 
         lob.cancelOrder(address(pair), 0);
         vm.stopPrank();
@@ -108,9 +112,10 @@ contract LimitOrderTest is Test {
     function testCancelNotYourOrder() public {
         bytes memory encryptedPrice = abi.encode(100 * 10 ** 18);
         bytes memory encryptedAmount = abi.encode(10 * 10 ** 18);
+        bytes memory signature = _generateMockSignature();
 
         vm.prank(bob);
-        lob.submitLimitOrder{value: 0.01 ether}(address(pair), encryptedPrice, encryptedAmount, true, 0);
+        lob.submitLimitOrder{value: 0.01 ether}(address(pair), encryptedPrice, encryptedAmount, true, 0, signature);
 
         vm.prank(alice);
         vm.expectRevert(ConfidentialLimitOrderBook.NotYourOrder.selector);
@@ -157,5 +162,20 @@ contract LimitOrderTest is Test {
     {
         LimitOrderStructs.LimitOrder memory order = _lob.getOrder(pool, orderId);
         return (order.maker, order.active);
+    }
+
+    // Helper to generate a mock signature (65 bytes)
+    function _generateMockSignature() internal pure returns (bytes memory) {
+        bytes memory signature = new bytes(65);
+        // Fill with dummy data (r, s, v)
+        bytes32 r = bytes32(uint256(1));
+        bytes32 s = bytes32(uint256(2));
+        uint8 v = 27;
+        assembly {
+            mstore(add(signature, 32), r)
+            mstore(add(signature, 64), s)
+            mstore(add(signature, 96), v)
+        }
+        return signature;
     }
 }

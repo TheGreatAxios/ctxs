@@ -19,12 +19,7 @@ contract ExecuteSwap is Script {
         uint256 amountIn = 1000 * 10 ** 6; // 1000 USDC
         uint256 amountOutMin = 0; // No slippage protection
 
-        IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(
-            amountIn,
-            amountOutMin,
-            path,
-            RECIPIENT
-        );
+        IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(amountIn, amountOutMin, path, RECIPIENT);
 
         vm.stopBroadcast();
     }

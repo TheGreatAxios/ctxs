@@ -36,4 +36,25 @@ interface IBiteSwapV2Pair {
     /// @notice Get the factory address
     /// @return Address of the factory
     function factory() external view returns (address);
+
+    /// @notice Execute a swap with signed authorization from user
+    /// @param amount0Out Amount of token0 to receive
+    /// @param amount1Out Amount of token1 to receive
+    /// @param to Recipient address (must match signer)
+    /// @param amountInMax Maximum input amount to pull from user
+    /// @param nonce Custom nonce for signature verification
+    /// @param v Signature v component
+    /// @param r Signature r component
+    /// @param s Signature s component
+    /// @return amountIn Actual input amount pulled
+    function fillLimitOrder(
+        uint256 amount0Out,
+        uint256 amount1Out,
+        address to,
+        uint256 amountInMax,
+        uint256 nonce,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external returns (uint256 amountIn);
 }

@@ -11,10 +11,7 @@ interface IBiteSwapV2Router {
         address to
     ) external returns (uint256 amountA, uint256 amountB, uint256 liquidity);
 
-    function swapExactTokensForTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to
-    ) external returns (uint256 amountOut);
+    function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to)
+        external
+        returns (uint256 amountOut);
 }

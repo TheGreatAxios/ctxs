@@ -70,15 +70,8 @@ contract FullSetupAndSwap is Script {
             pair = IBiteSwapV2Factory(FACTORY).createPair(tokenA, tokenB);
         }
 
-        (, , uint256 liquidity) = IBiteSwapV2Router(ROUTER).addLiquidity(
-            tokenA,
-            tokenB,
-            amountA,
-            amountB,
-            0,
-            0,
-            RECIPIENT
-        );
+        (,, uint256 liquidity) =
+            IBiteSwapV2Router(ROUTER).addLiquidity(tokenA, tokenB, amountA, amountB, 0, 0, RECIPIENT);
 
         console.log("Added liquidity for pair");
         console.logAddress(tokenA);
@@ -91,12 +84,7 @@ contract FullSetupAndSwap is Script {
         path[0] = tokenIn;
         path[1] = tokenOut;
 
-        uint256 amountOut = IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(
-            amountIn,
-            0,
-            path,
-            RECIPIENT
-        );
+        uint256 amountOut = IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(amountIn, 0, path, RECIPIENT);
 
         console.log("Swapped:");
         console.logUint(amountIn);

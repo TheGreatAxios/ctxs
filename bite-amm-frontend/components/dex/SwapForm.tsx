@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useAccount, useBalance, useReadContract, useSwitchChain } from 'wagmi';
+import { useQueryClient } from '@tanstack/react-query';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { ArrowDownUp, AlertCircle, Settings, Zap, DollarSign, Eye, EyeOff } from 'lucide-react';
 import { cn, formatBigInt, parseBigInt } from '@/lib/utils';
@@ -42,9 +43,12 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
   const [showSlippageSettings, setShowSlippageSettings] = useState(false);
   const [useEncryption, setUseEncryption] = useState(true); // Default: BITE encrypted
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
+  const [processedReceiptHash, setProcessedReceiptHash] = useState<string | null>(null);
 
-  const { swap, isPending: swapPending, isConfirming, error: swapError, clearError: clearSwapError } = useSwap();
+  const { swap, isPending: swapPending, isConfirming, receipt: swapReceipt, error: swapError, clearError: clearSwapError } = useSwap();
+  const queryClient = useQueryClient();
   const { approve: approveToken, isPending: approvePending, error: approveError, clearError: clearApproveError, receipt: approveReceipt } = useApprove();
 
   const { pairAddress, isLoading: isLoadingPair } = usePairAddress(
@@ -53,7 +57,7 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
     toToken?.address
   );
 
-  const { data: fromBalance } = useBalance({
+  const { data: fromBalance, refetch: refetchFromBalance } = useBalance({
     address: address,
     token: fromToken?.address,
   });
@@ -93,6 +97,8 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
     functionName: 'getReserves',
     query: {
       enabled: !!pairAddress && pairAddress !== '0x0000000000000000000000000000000000000000',
+      staleTime: 5_000, // 5 seconds - more responsive for price data
+      refetchInterval: 10_000, // Refetch every 10 seconds for live prices
     },
   }) as { data: readonly [bigint, bigint, bigint] | undefined };
 
@@ -102,6 +108,7 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
     functionName: 'token0',
     query: {
       enabled: !!pairAddress && pairAddress !== '0x0000000000000000000000000000000000000000',
+      staleTime: 300_000, // 5 minutes - token addresses don't change
     },
   });
 
@@ -185,6 +192,65 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
     }
   }, [approveReceipt]);
 
+  // Refetch all data when swap receipt is received with success
+  useEffect(() => {
+    if (swapReceipt && swapReceipt.status === "success") {
+      // Only process if this is a new receipt
+      const receiptHash = swapReceipt.transactionHash;
+      if (receiptHash === processedReceiptHash) {
+        return; // Already processed this receipt
+      }
+
+      console.log("Swap confirmed, refetching all data");
+
+      // Store swap details for success message before clearing amounts
+      const fromAmount = cachedAmounts.fromAmount;
+      const fromSymbol = fromToken?.symbol;
+      const toAmount = cachedAmounts.toAmount;
+      const toSymbol = toToken?.symbol;
+
+      // Mark as processed
+      setProcessedReceiptHash(receiptHash);
+
+      // Refetch balances
+      refetchFromBalance();
+      if (toToken?.address && address) {
+        queryClient.invalidateQueries({
+          queryKey: ['balance', address, toToken.address],
+        });
+      }
+
+      // Refetch reserves via query invalidation (triggers useReadContract to refetch)
+      if (pairAddress && pairAddress !== '0x0000000000000000000000000000000000000000') {
+        queryClient.invalidateQueries({
+          queryKey: ['readContract', { address: pairAddress, functionName: 'getReserves' }],
+        });
+      }
+
+      // Refetch allowance
+      refetchAllowance();
+
+      // Clear form amounts after successful swap
+      setCachedAmounts({ fromAmount: '', toAmount: '' });
+
+      // Clear any existing error
+      setError(null);
+
+      // Show success message
+      if (fromAmount && toAmount && fromSymbol && toSymbol) {
+        setSuccessMessage(`Swapped ${fromAmount} ${fromSymbol} for ${toAmount} ${toSymbol}`);
+      }
+
+      // Auto-hide success message after 5 seconds
+      const timer = setTimeout(() => {
+        setSuccessMessage(null);
+      }, 5000);
+
+      console.log("Swap complete - all data refetched");
+      return () => clearTimeout(timer);
+    }
+  }, [swapReceipt, pairAddress, toToken, fromToken, address, queryClient, refetchFromBalance, refetchAllowance, setCachedAmounts, cachedAmounts, processedReceiptHash]);
+
   const handleSwapTokens = () => {
     setFromToken(toToken);
     setToToken(fromToken);
@@ -241,6 +307,8 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
     if (!fromToken || !toToken || !routerAddress || !address) return;
 
     setError(null);
+    setSuccessMessage(null);
+    setProcessedReceiptHash(null); // Clear processed hash for new swap
     clearApproveError();
     const amountIn = parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18);
     // Use the slippage state value (e.g., "0.1" = 0.1%, "1" = 1%)
@@ -256,6 +324,7 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
       amountIn,
       amountOutMin,
       recipient: address,
+      useEncryption,
     });
   };
 
@@ -616,6 +685,18 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Success Display */}
+      {successMessage && (
+        <div className="bg-primary/10 border-2 border-solid border-primary rounded-xl p-3 brutalist-shadow-sm">
+          <div className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-primary shrink-0" />
+            <span className="text-xs font-extrabold uppercase tracking-wide text-stone-900">
+              {successMessage}
+            </span>
+          </div>
         </div>
       )}
 

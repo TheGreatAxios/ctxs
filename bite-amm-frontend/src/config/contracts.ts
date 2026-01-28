@@ -32,15 +32,15 @@ interface ChainContractConfig {
 
 const CHAIN_CONTRACTS: Record<number, ChainContractConfig> = {
   2090472038: {
-    limitOrderBook: '0xd2b09f3953842dcc7726eea3dabc5032a28acf8e' as Address,
-    factory: '0x6001dc6b74be63994c07583e0c705b7f1e7ccd7d' as Address,
-    router: '0x4aee8b2c55380e889824a731d687ad5468441546' as Address,
+    limitOrderBook: '0x11a0d3f5be17353e13Cf7b7CB9877b7fbE8a187a' as Address,
+    factory: '0xE5d5c7B44A3B60201ba944eCF8e3476c6FBFf4e0' as Address,
+    router: '0xB21aa5b8de0e7854675e78513F2CF89D08b4Eaa4' as Address,
     pairs: {
-      USDC_WETH: '0x8a37d79658a4d5c61b409eb8aa2631766b52ea75' as Address,
-      USDC_WBTC: '0xe5c3bfb8c260c40d9c7a7b6884fc12d1544e2375' as Address,
-      USDT_WETH: '0x239a6b8391f417a4181919ab885c5c39c072b9ff' as Address,
-      USDT_WBTC: '0x24f7caf1d55fd26e60f6c7511efd241aa738ae3b' as Address,
-      WETH_WBTC: '0x8c8e3f3c9fe7ec5bda83d1e988ff994acb5390b8' as Address,
+      USDC_WETH: '0x61a840adb0c327945c98C2975b1a6B8535072780' as Address,
+      USDC_WBTC: '0x6217f4e65806b61735E546C19821404645701E0D' as Address,
+      USDT_WETH: '0x6db47AbfbAC30a91cE9667054f16e2968F58Fb06' as Address,
+      USDT_WBTC: '0xB38100d8d0789ce23d9C0F8D1C12dB8251d38a7B' as Address,
+      WETH_WBTC: '0xFF9731319aF6cb2191b0A74fd074FC1dcE9cd368' as Address,
     },
   },
 };

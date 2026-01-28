@@ -3,7 +3,9 @@ pragma solidity 0.8.24;
 import "forge-std/Script.sol";
 
 interface IRouter {
-    function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to) external returns (uint256 amountOut);
+    function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to)
+        external
+        returns (uint256 amountOut);
 }
 
 contract EncodeSwapCalldata is Script {
@@ -19,8 +21,8 @@ contract EncodeSwapCalldata is Script {
 
         bytes memory calldata_ = abi.encodeWithSelector(
             IRouter.swapExactTokensForTokens.selector,
-            1000000000,      // 1000 USDC
-            990000000000000000,  // min WETH out
+            1000000000, // 1000 USDC
+            990000000000000000, // min WETH out
             path,
             RECIPIENT
         );
