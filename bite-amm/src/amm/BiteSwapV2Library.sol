@@ -2,6 +2,7 @@ pragma solidity 0.8.24;
 
 import "../amm/interfaces/IBiteSwapV2Factory.sol";
 import "../amm/interfaces/IBiteSwapV2Pair.sol";
+import "../amm/BiteSwapV2Pair.sol";
 
 /**
  * @title BiteSwap V2 Library
@@ -35,6 +36,7 @@ library BiteSwapV2Library {
      */
     function pairFor(address factory, address tokenA, address tokenB) internal view returns (address pair) {
         (address token0, address token1) = sortTokens(tokenA, tokenB);
+        bytes32 initCodeHash = keccak256(type(BiteSwapV2Pair).creationCode);
         pair = address(
             uint160(
                 uint256(
@@ -43,7 +45,7 @@ library BiteSwapV2Library {
                             hex"ff", // init code hash prefix
                             factory,
                             keccak256(abi.encodePacked(token0, token1)),
-                            hex"bfd69a0691d3eeec7fa2011c6343d9c83eca4692c8d196646d27745d79bf74fd" // Pair init code hash (from CREATE2)
+                            initCodeHash
                         )
                     )
                 )
@@ -159,5 +161,32 @@ library BiteSwapV2Library {
         uint256 numerator = reserveIn * amountOut * 1000;
         uint256 denominator = (reserveOut - amountOut) * 997;
         amountIn = (numerator / denominator) + 1;
+    }
+
+    /**
+     * @notice Calculate output amounts for a swap step
+     * @param pair Pair address
+     * @param input Input token address
+     * @param output Output token address
+     * @return amount0Out Amount of token0 out
+     * @return amount1Out Amount of token1 out
+     */
+    function getSwapAmounts(address pair, address input, address output)
+        internal
+        view
+        returns (uint256 amount0Out, uint256 amount1Out)
+    {
+        (address token0,) = sortTokens(input, output);
+        (uint112 reserve0, uint112 reserve1,) = IBiteSwapV2Pair(pair).getReserves();
+        uint256 balanceIn = IERC20(input).balanceOf(pair);
+        uint256 reserveIn = input == token0 ? reserve0 : reserve1;
+        uint256 reserveOut = input == token0 ? reserve1 : reserve0;
+        uint256 amountIn = balanceIn - reserveIn;
+        uint256 out = getAmountOut(amountIn, reserveIn, reserveOut);
+        if (input == token0) {
+            return (0, out);
+        } else {
+            return (out, 0);
+        }
     }
 }

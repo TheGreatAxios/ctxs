@@ -248,18 +248,15 @@ contract BiteSwapV2Router {
 
     function _swap(address[] memory path, address _to) internal {
         for (uint256 i; i < path.length - 1; i++) {
-            (address input, address output) = (path[i], path[i + 1]);
-            (address token0,) = BiteSwapV2Library.sortTokens(input, output);
-            IBiteSwapV2Pair pair = IBiteSwapV2Pair(BiteSwapV2Library.pairFor(address(factory), input, output));
-            uint256 amount0Out;
-            uint256 amount1Out;
-            if (input == token0) {
-                (amount0Out, amount1Out) = (0, uint256(type(uint112).max));
-            } else {
-                (amount0Out, amount1Out) = (uint256(type(uint112).max), 0);
-            }
-            address to = i < path.length - 2 ? BiteSwapV2Library.pairFor(address(factory), output, path[i + 2]) : _to;
-            pair.swap(amount0Out, amount1Out, to, new bytes(0));
+            address input = path[i];
+            address output = path[i + 1];
+            address pairAddr = BiteSwapV2Library.pairFor(address(factory), input, output);
+            (uint256 amount0Out, uint256 amount1Out) =
+                BiteSwapV2Library.getSwapAmounts(pairAddr, input, output);
+            address to = i < path.length - 2
+                ? BiteSwapV2Library.pairFor(address(factory), output, path[i + 2])
+                : _to;
+            IBiteSwapV2Pair(pairAddr).swap(amount0Out, amount1Out, to, new bytes(0));
         }
     }
 

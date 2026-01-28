@@ -188,7 +188,6 @@ contract BiteSwapV2Pair is IBiteSwapV2Pair, ERC20, ReentrancyGuard {
         {
             address _token0 = token0;
             address _token1 = token1;
-            if (to == _token0 || to == _token1) revert InvalidTo();
 
             if (amount0Out > 0) {
                 _safeTransfer(_token0, to, amount0Out);

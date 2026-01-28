@@ -65,10 +65,11 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     // ═════════════════════════════════════════════════════════════════════════
     // Admin
     // ═════════════════════════════════════════════════════════════════════════
-    /// @notice Set the factory address
+    /// @notice Set the factory address (only callable once)
     /// @param _factory Address of the AMM factory
     function setFactory(address _factory) external {
-        if (address(factory) != address(0) && msg.sender != address(this)) revert NotFactory();
+        if (address(factory) != address(0)) revert NotFactory();
+        if (_factory == address(0)) revert NotFactory();
         factory = IBiteSwapV2Factory(_factory);
         emit FactorySet(_factory);
     }
@@ -197,15 +198,7 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
                 continue;
             }
 
-            // Check gas balance
-            if (userGasBalance[order.maker] < CTX_GAS_COST) {
-                unchecked {
-                    ++i;
-                }
-                continue;
-            }
-
-            // Check gas balance first - skip if insufficient funds
+            // Check gas balance - skip if insufficient funds
             uint256 gasCost = CTX_GAS_COST;
             if (userGasBalance[order.maker] < gasCost) {
                 unchecked {
@@ -214,9 +207,6 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
                 continue;
             }
 
-            // Deduct gas and submit CTX
-            userGasBalance[order.maker] -= gasCost;
-
             bytes[] memory encryptedArgs = new bytes[](2);
             encryptedArgs[0] = order.encryptedTargetPrice;
             encryptedArgs[1] = order.encryptedAmount;
@@ -224,12 +214,19 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
             bytes[] memory plaintextArgs = new bytes[](3);
             plaintextArgs[0] = abi.encode(pool);
             plaintextArgs[1] = abi.encode(order.direction);
-            plaintextArgs[2] = abi.encode(i);
+            plaintextArgs[2] = abi.encodePacked(order.maker, order.nonce); // Stable ID
 
             address ctxSender = BITEPrecompile.submitCTX(encryptedArgs, plaintextArgs);
 
+            // Deduct gas only after successful CTX submission
+            userGasBalance[order.maker] -= gasCost;
+
             (bool success,) = payable(ctxSender).call{value: gasCost}("");
-            if (!success) revert TransferFailed();
+            if (!success) {
+                // Refund gas if ETH transfer fails
+                userGasBalance[order.maker] += gasCost;
+                revert TransferFailed();
+            }
 
             emit CTXSubmitted(pool, i, ctxSender);
 
@@ -242,22 +239,24 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     /// @notice BITE V2 callback - called with decrypted values
     /// @dev Only callable by BITE V2 system
     /// @param decryptedArgs Decrypted values [targetPrice, amount]
-    /// @param plainArgs Plaintext values [pool, direction, orderId]
+    /// @param plainArgs Plaintext values [pool, direction, maker, nonce]
     function onDecrypt(bytes[] calldata decryptedArgs, bytes[] calldata plainArgs) external nonReentrant {
         if (decryptedArgs.length != 2) revert InvalidOrderData();
-        if (plainArgs.length != 3) revert InvalidOrderData();
+        if (plainArgs.length != 4) revert InvalidOrderData();
 
         // Decode plaintext args
         address pool = abi.decode(plainArgs[0], (address));
         bool direction = abi.decode(plainArgs[1], (bool));
-        uint256 orderId = abi.decode(plainArgs[2], (uint256));
+        address maker = abi.decode(plainArgs[2], (address));
+        uint256 nonce = abi.decode(plainArgs[3], (uint256));
 
         // Validate pool
         if (!_isValidPool(pool)) revert InvalidPool();
 
-        // Get order reference
+        // Find order by maker and nonce (stable lookup)
         LimitOrderStructs.LimitOrder[] storage orders = poolOrders[pool];
-        if (orderId >= orders.length) revert OrderNotFound();
+        uint256 orderId = _findOrderIndex(orders, maker, nonce);
+        if (orderId == type(uint256).max) revert OrderNotFound();
 
         LimitOrderStructs.LimitOrder storage order = orders[orderId];
 
@@ -277,8 +276,8 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
         (bool met, uint256 outputAmount) = _checkPriceCondition(pool, targetPrice, amount, direction);
 
         if (met) {
-            // Attempt swap with safe error handling
-            (bool success, bytes memory errorData) = _executeSwap(pool, amount, direction, order.maker);
+            // Attempt swap with safe error handling - use calculated output amount
+            (bool success, bytes memory errorData) = _executeSwap(pool, outputAmount, direction, order.maker);
 
             if (success) {
                 // Swap succeeded - mark order as filled
@@ -377,17 +376,32 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     /// @return valid True if valid pool
     function _isValidPool(address pool) internal view returns (bool valid) {
         if (pool == address(0)) return false;
-        if (address(factory) == address(0)) return true; // Allow any pool if factory not set
+        if (address(factory) == address(0)) return false; // Require factory to be set
 
-        try factory.getPair(address(0), address(0)) returns (address) {
-            // If factory is set, verify pool was created by it
-            // by checking if it has a valid token0/token1
-            address token0 = IBiteSwapV2Pair(pool).token0();
+        try IBiteSwapV2Pair(pool).token0() returns (address token0) {
             address token1 = IBiteSwapV2Pair(pool).token1();
             return factory.getPair(token0, token1) == pool;
         } catch {
             return false;
         }
+    }
+
+    /// @notice Find order index by maker and nonce
+    /// @param orders Orders array to search
+    /// @param maker Order maker address
+    /// @param nonce Order nonce
+    /// @return orderId Order index or type(uint256).max if not found
+    function _findOrderIndex(LimitOrderStructs.LimitOrder[] storage orders, address maker, uint256 nonce)
+        internal
+        view
+        returns (uint256 orderId)
+    {
+        for (uint256 i = 0; i < orders.length; ++i) {
+            if (orders[i].maker == maker && orders[i].nonce == nonce) {
+                return i;
+            }
+        }
+        return type(uint256).max;
     }
 
     // ═════════════════════════════════════════════════════════════════════════

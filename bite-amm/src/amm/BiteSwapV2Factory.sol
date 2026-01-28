@@ -51,8 +51,15 @@ contract BiteSwapV2Factory is IBiteSwapV2Factory {
 
     /// @notice Set the limit order book address
     /// @param _limitOrderBook Address of the limit order book
+    /// @dev Only callable once by anyone, then only by current LOB
     function setLimitOrderBook(address _limitOrderBook) external override {
-        if (msg.sender != limitOrderBook && limitOrderBook != address(0)) revert NotAuthorized();
+        if (limitOrderBook == address(0)) {
+            // First set - anyone can call (for initial setup)
+            if (_limitOrderBook == address(0)) revert NotAuthorized();
+        } else {
+            // Subsequent sets - only current LOB can change
+            if (msg.sender != limitOrderBook) revert NotAuthorized();
+        }
         limitOrderBook = _limitOrderBook;
     }
 

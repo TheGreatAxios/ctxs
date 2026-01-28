@@ -6,8 +6,8 @@ import "../src/amm/interfaces/IBiteSwapV2Router.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract FullSetupAndSwap is Script {
-    address constant FACTORY = 0xa52BE42A286A4446D3BC07fc921Eb7F392aEe8a0;
-    address constant ROUTER = 0x689Afad46B3EB17E734CF4aB1d8307CB520E5BD4;
+    address constant FACTORY = 0xE5d5c7B44A3B60201ba944eCF8e3476c6FBFf4e0;
+    address constant ROUTER = 0xB21aa5b8de0e7854675e78513F2CF89D08b4Eaa4;
 
     address constant USDC = 0xC8EEde488d7152CED970D9e9621D9330b64Cfd24;
     address constant USDT = 0x7433ddb971F6a29e24bac69E2d86396201A7aa78;
