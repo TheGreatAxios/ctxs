@@ -77,16 +77,18 @@ export function GasDepositManager({
   };
 
   return (
-    <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-6">
+    <div className="bg-white border-3 border-black brutalist-shadow-lg rounded-2xl p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Wallet className="w-5 h-5 text-blue-400" />
-          <h3 className="text-lg font-semibold text-white">CTX Gas Deposit</h3>
+          <div className="w-10 h-10 flex items-center justify-center bg-primary rounded-full border-2 border-black">
+            <Wallet className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <h3 className="text-lg font-black text-stone-900 uppercase tracking-widest">CTX Gas Deposit</h3>
         </div>
         <div className="text-right">
-          <p className="text-xs text-gray-400">Current Balance</p>
-          <p className={`text-lg font-mono font-semibold ${
-            needsDeposit ? 'text-red-400' : isLow ? 'text-yellow-400' : 'text-green-400'
+          <p className="text-xs font-bold text-stone-500 uppercase tracking-wider">Current Balance</p>
+          <p className={`text-lg font-mono font-black ${
+            needsDeposit ? 'text-error' : isLow ? 'text-warning' : 'text-success'
           }`}>
             {formattedBalance} sFUEL
           </p>
@@ -95,14 +97,14 @@ export function GasDepositManager({
 
       {/* Status Message */}
       {needsDeposit && (
-        <div className="bg-red-900/30 rounded-lg p-3 border border-red-700 mb-4">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-red-400 mt-0.5" />
+        <div className="bg-error/10 border-2 border-error rounded-xl p-4 mb-5 brutalist-shadow-sm">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-error flex-shrink-0" />
             <div>
-              <p className="text-sm text-red-200 font-medium">
+              <p className="text-sm font-black text-stone-900 uppercase tracking-wider">
                 No Gas Deposit
               </p>
-              <p className="text-xs text-red-300 mt-1">
+              <p className="text-xs font-semibold text-stone-600 mt-1">
                 Deposit gas to enable CTX execution for your orders
               </p>
             </div>
@@ -111,14 +113,14 @@ export function GasDepositManager({
       )}
 
       {isLow && (
-        <div className="bg-yellow-900/30 rounded-lg p-3 border border-yellow-700 mb-4">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-yellow-400 mt-0.5" />
+        <div className="bg-warning/10 border-2 border-warning rounded-xl p-4 mb-5 brutalist-shadow-sm">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-warning flex-shrink-0" />
             <div>
-              <p className="text-sm text-yellow-200 font-medium">
+              <p className="text-sm font-black text-stone-900 uppercase tracking-wider">
                 Low Gas Balance
               </p>
-              <p className="text-xs text-yellow-300 mt-1">
+              <p className="text-xs font-semibold text-stone-600 mt-1">
                 Consider depositing more gas for multiple orders
               </p>
             </div>
@@ -127,14 +129,14 @@ export function GasDepositManager({
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-5">
         <button
           type="button"
           onClick={() => setActiveTab('deposit')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg font-medium transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black uppercase tracking-wider transition-all ${
             activeTab === 'deposit'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              ? 'bg-primary text-primary-foreground border-3 border-black brutalist-shadow'
+              : 'bg-stone-100 text-stone-600 border-2 border-stone-300 hover:bg-stone-200'
           }`}
         >
           <ArrowUp className="w-4 h-4" />
@@ -144,11 +146,11 @@ export function GasDepositManager({
           type="button"
           onClick={() => setActiveTab('withdraw')}
           disabled={currentBalance === 0n}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg font-medium transition-colors ${
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-black uppercase tracking-wider transition-all ${
             activeTab === 'withdraw'
-              ? 'bg-gray-700 text-white'
-              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-          } disabled:opacity-50 disabled:cursor-not-allowed`}
+              ? 'bg-secondary text-secondary-foreground border-3 border-black brutalist-shadow'
+              : 'bg-stone-100 text-stone-400 border-2 border-stone-300 hover:bg-stone-200'
+          } disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none`}
         >
           <ArrowDown className="w-4 h-4" />
           Withdraw
@@ -159,7 +161,7 @@ export function GasDepositManager({
       {activeTab === 'deposit' && (
         <form onSubmit={handleDeposit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-bold text-stone-700 mb-2 uppercase tracking-wider">
               Deposit Amount (sFUEL)
             </label>
             <input
@@ -169,7 +171,7 @@ export function GasDepositManager({
               onChange={(e) => setDepositAmount(e.target.value)}
               placeholder="0.01"
               required
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-white border-3 border-black rounded-xl px-4 py-3 text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-4 focus:ring-primary/50 font-semibold"
             />
           </div>
 
@@ -178,21 +180,21 @@ export function GasDepositManager({
             <button
               type="button"
               onClick={() => handleQuickDeposit(RECOMMENDED_DEPOSIT)}
-              className="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-3 rounded-lg transition-colors"
+              className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-black py-2 px-3 rounded-xl border-2 border-black transition-all uppercase tracking-wider"
             >
               0.01 sFUEL
             </button>
             <button
               type="button"
               onClick={() => handleQuickDeposit(BigInt('20000000000000000'))}
-              className="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-3 rounded-lg transition-colors"
+              className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-black py-2 px-3 rounded-xl border-2 border-black transition-all uppercase tracking-wider"
             >
               0.02 sFUEL
             </button>
             <button
               type="button"
               onClick={() => handleQuickDeposit(BigInt('50000000000000000'))}
-              className="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-3 rounded-lg transition-colors"
+              className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-black py-2 px-3 rounded-xl border-2 border-black transition-all uppercase tracking-wider"
             >
               0.05 sFUEL
             </button>
@@ -201,7 +203,7 @@ export function GasDepositManager({
           <button
             type="submit"
             disabled={!address || isDepositing || !depositAmount}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-lg px-4 py-3 transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-primary hover:bg-primary/90 disabled:bg-stone-300 disabled:cursor-not-allowed disabled:shadow-none text-primary-foreground font-black rounded-xl px-4 py-4 brutalist-shadow transition-all hover:translate-y-1 hover:shadow-[2px_2px_0_0_#000] active:shadow-none active:translate-y-2 uppercase tracking-widest flex items-center justify-center gap-2"
           >
             {isDepositing && <Loader2 className="w-5 h-5 animate-spin" />}
             {isDepositing ? 'Depositing...' : 'Deposit Gas'}
@@ -213,7 +215,7 @@ export function GasDepositManager({
       {activeTab === 'withdraw' && (
         <form onSubmit={handleWithdraw} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-bold text-stone-700 mb-2 uppercase tracking-wider">
               Withdraw Amount (sFUEL)
             </label>
             <input
@@ -223,9 +225,9 @@ export function GasDepositManager({
               onChange={(e) => setWithdrawAmount(e.target.value)}
               placeholder="0.00"
               required
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-white border-3 border-black rounded-xl px-4 py-3 text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-4 focus:ring-secondary/50 font-semibold"
             />
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-2 text-xs font-semibold text-stone-500">
               Available: {formattedBalance} sFUEL
             </p>
           </div>
@@ -233,7 +235,7 @@ export function GasDepositManager({
           <button
             type="button"
             onClick={() => setWithdrawAmount(formattedBalance)}
-            className="w-full bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-3 rounded-lg transition-colors"
+            className="w-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-black py-2 px-3 rounded-xl border-2 border-black transition-all uppercase tracking-wider"
           >
             Withdraw All
           </button>
@@ -241,7 +243,7 @@ export function GasDepositManager({
           <button
             type="submit"
             disabled={!address || isWithdrawing || !withdrawAmount}
-            className="w-full bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-medium rounded-lg px-4 py-3 transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-secondary hover:bg-secondary/90 disabled:bg-stone-300 disabled:cursor-not-allowed disabled:shadow-none text-secondary-foreground font-black rounded-xl px-4 py-4 brutalist-shadow transition-all hover:translate-y-1 hover:shadow-[2px_2px_0_0_#000] active:shadow-none active:translate-y-2 uppercase tracking-widest flex items-center justify-center gap-2"
           >
             {isWithdrawing && <Loader2 className="w-5 h-5 animate-spin" />}
             {isWithdrawing ? 'Withdrawing...' : 'Withdraw Gas'}
@@ -250,7 +252,7 @@ export function GasDepositManager({
       )}
 
       {!address && (
-        <p className="text-center text-sm text-gray-400">
+        <p className="text-center text-sm font-semibold text-stone-500">
           Please connect your wallet
         </p>
       )}

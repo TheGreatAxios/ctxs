@@ -2,11 +2,11 @@ pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./interfaces/ISushiSwapV2Pair.sol";
-import "./interfaces/ISushiSwapV2Factory.sol";
+import "./interfaces/IBiteSwapV2Pair.sol";
+import "./interfaces/IBiteSwapV2Factory.sol";
 import "./interfaces/ILimitOrderBook.sol";
 
-contract SushiSwapV2Pair is ISushiSwapV2Pair, ERC20, ReentrancyGuard {
+contract BiteSwapV2Pair is IBiteSwapV2Pair, ERC20, ReentrancyGuard {
     error InsufficientLiquidity();
     error InsufficientOutputAmount();
     error InsufficientInputAmount();
@@ -51,7 +51,7 @@ contract SushiSwapV2Pair is ISushiSwapV2Pair, ERC20, ReentrancyGuard {
         locked = false;
     }
 
-    constructor() ERC20("SushiSwap V2 LP", "SLP") {
+    constructor() ERC20("BiteSwap V2 LP", "BLP") {
         factory = msg.sender;
     }
 
@@ -80,7 +80,7 @@ contract SushiSwapV2Pair is ISushiSwapV2Pair, ERC20, ReentrancyGuard {
     function _update(uint256 balance0, uint256 balance1) private {
         if (balance0 > type(uint112).max || balance1 > type(uint112).max) revert Overflow();
 
-        uint32 blockTimestamp = uint32(block.timestamp % 2**32);
+        uint32 blockTimestamp = uint32(block.timestamp % 2 ** 32);
         uint32 timeElapsed = blockTimestamp - blockTimestampLast;
 
         if (timeElapsed > 0 && reserve0 != 0 && reserve1 != 0) {
@@ -100,11 +100,11 @@ contract SushiSwapV2Pair is ISushiSwapV2Pair, ERC20, ReentrancyGuard {
     /// @param reserveIn Reserve of input token
     /// @param reserveOut Reserve of output token
     /// @return amountOut Output amount
-    function getAmountOut(
-        uint256 amountIn,
-        uint256 reserveIn,
-        uint256 reserveOut
-    ) public pure returns (uint256 amountOut) {
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut)
+        public
+        pure
+        returns (uint256 amountOut)
+    {
         if (amountIn == 0) revert InsufficientInputAmount();
         if (reserveIn == 0 || reserveOut == 0) revert InsufficientLiquidity();
 
@@ -131,10 +131,7 @@ contract SushiSwapV2Pair is ISushiSwapV2Pair, ERC20, ReentrancyGuard {
             liquidity = _sqrt(amount0 * amount1) - MINIMUM_LIQUIDITY;
             _mint(address(1), MINIMUM_LIQUIDITY);
         } else {
-            liquidity = min(
-                (amount0 * _totalSupply) / _reserve0,
-                (amount1 * _totalSupply) / _reserve1
-            );
+            liquidity = min((amount0 * _totalSupply) / _reserve0, (amount1 * _totalSupply) / _reserve1);
         }
 
         if (liquidity == 0) revert InsufficientLiquidity();
@@ -178,7 +175,7 @@ contract SushiSwapV2Pair is ISushiSwapV2Pair, ERC20, ReentrancyGuard {
     /// @param amount1Out Amount of token1 to receive
     /// @param to Recipient address
     /// @param data Optional callback data
-    function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external lock nonReentrant {
+    function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external lock nonReentrant {
         if (amount0Out == 0 && amount1Out == 0) revert InsufficientOutputAmount();
         if (to == token0 || to == token1) revert InvalidTo();
 
@@ -212,9 +209,7 @@ contract SushiSwapV2Pair is ISushiSwapV2Pair, ERC20, ReentrancyGuard {
         {
             uint256 balance0Adjusted = (balance0 * 1000) - (amount0In * 3);
             uint256 balance1Adjusted = (balance1 * 1000) - (amount1In * 3);
-            if (
-                balance0Adjusted * balance1Adjusted < uint256(_reserve0) * uint256(_reserve1) * 1000000
-            ) revert K();
+            if (balance0Adjusted * balance1Adjusted < uint256(_reserve0) * uint256(_reserve1) * 1000000) revert K();
         }
 
         _update(balance0, balance1);
@@ -226,26 +221,26 @@ contract SushiSwapV2Pair is ISushiSwapV2Pair, ERC20, ReentrancyGuard {
 
     /// @notice Swap hook callback - triggers limit order check
     /// @dev Called after swap completes internally
+    /// @dev Failures in checkOrders should not revert the swap
     function _checkLimitOrders() internal {
-        address lob = ISushiSwapV2Factory(factory).limitOrderBook();
+        address lob = IBiteSwapV2Factory(factory).limitOrderBook();
         if (lob != address(0)) {
-            ILimitOrderBook(lob).checkOrders(address(this));
-            emit SwapHookCalled(address(this));
+            try ILimitOrderBook(lob).checkOrders(address(this)) {
+                emit SwapHookCalled(address(this));
+            } catch {
+                // Silently fail - limit order book errors should not break swaps
+                emit SwapHookCalled(address(this));
+            }
         }
     }
 
     /// @notice Sync reserves to current balances
     function sync() external nonReentrant {
-        _update(
-            IERC20(token0).balanceOf(address(this)),
-            IERC20(token1).balanceOf(address(this))
-        );
+        _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)));
     }
 
     function _safeTransfer(address token, address to, uint256 value) private {
-        (bool success, bytes memory data) = token.call(
-            abi.encodeWithSignature("transfer(address,uint256)", to, value)
-        );
+        (bool success, bytes memory data) = token.call(abi.encodeWithSignature("transfer(address,uint256)", to, value));
         if (!success || (data.length > 0 && !abi.decode(data, (bool)))) revert("Transfer failed");
     }
 

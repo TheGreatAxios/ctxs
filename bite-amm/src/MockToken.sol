@@ -13,15 +13,10 @@ contract MockToken is ERC20 {
     /// @param symbol Token symbol
     /// @param _allowMinting Whether to allow minting after deployment
     /// @param _decimals Token decimals (default 18)
-    constructor(
-        string memory name,
-        string memory symbol,
-        bool _allowMinting,
-        uint8 _decimals
-    ) ERC20(name, symbol) {
+    constructor(string memory name, string memory symbol, bool _allowMinting, uint8 _decimals) ERC20(name, symbol) {
         ALLOW_MINTING = _allowMinting;
         DECIMALS = _decimals;
-        _mint(msg.sender, 1_000_000 * 10**_decimals);
+        _mint(msg.sender, 1_000_000 * 10 ** _decimals);
     }
 
     function decimals() public view override returns (uint8) {

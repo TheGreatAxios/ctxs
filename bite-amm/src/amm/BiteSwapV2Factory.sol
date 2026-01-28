@@ -1,16 +1,16 @@
 pragma solidity 0.8.24;
 
-import "./interfaces/ISushiSwapV2Factory.sol";
-import "./SushiSwapV2Pair.sol";
+import "./interfaces/IBiteSwapV2Factory.sol";
+import "./BiteSwapV2Pair.sol";
 
-contract SushiSwapV2Factory is ISushiSwapV2Factory {
+contract BiteSwapV2Factory is IBiteSwapV2Factory {
     error IdenticalAddresses();
     error ZeroAddress();
     error PairExists();
     error NotAuthorized();
 
     address public override limitOrderBook;
-    bytes32 public constant INIT_CODE_PAIR_HASH = keccak256(type(SushiSwapV2Pair).creationCode);
+    bytes32 public constant INIT_CODE_PAIR_HASH = keccak256(type(BiteSwapV2Pair).creationCode);
 
     mapping(address => mapping(address => address)) public override getPair;
     address[] public allPairs;
@@ -33,16 +33,14 @@ contract SushiSwapV2Factory is ISushiSwapV2Factory {
         if (tokenA == tokenB) revert IdenticalAddresses();
         if (tokenA == address(0) || tokenB == address(0)) revert ZeroAddress();
 
-        (address token0, address token1) = tokenA < tokenB
-            ? (tokenA, tokenB)
-            : (tokenB, tokenA);
+        (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
 
         if (getPair[token0][token1] != address(0)) revert PairExists();
 
         bytes32 salt = keccak256(abi.encodePacked(token0, token1));
-        pair = address(new SushiSwapV2Pair{salt: salt}());
+        pair = address(new BiteSwapV2Pair{salt: salt}());
 
-        SushiSwapV2Pair(pair).initialize(token0, token1);
+        BiteSwapV2Pair(pair).initialize(token0, token1);
 
         getPair[token0][token1] = pair;
         getPair[token1][token0] = pair;
@@ -66,19 +64,14 @@ contract SushiSwapV2Factory is ISushiSwapV2Factory {
         if (tokenA == tokenB) revert IdenticalAddresses();
         if (tokenA == address(0) || tokenB == address(0)) revert ZeroAddress();
 
-        (address token0, address token1) = tokenA < tokenB
-            ? (tokenA, tokenB)
-            : (tokenB, tokenA);
+        (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
 
         pair = address(
             uint160(
                 uint256(
                     keccak256(
                         abi.encodePacked(
-                            hex"ff",
-                            address(this),
-                            keccak256(abi.encodePacked(token0, token1)),
-                            INIT_CODE_PAIR_HASH
+                            hex"ff", address(this), keccak256(abi.encodePacked(token0, token1)), INIT_CODE_PAIR_HASH
                         )
                     )
                 )

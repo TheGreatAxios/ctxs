@@ -1,7 +1,10 @@
 import ConfidentialLimitOrderBookABI from "../../abi/ConfidentialLimitOrderBook.json";
-import SushiSwapV2FactoryABI from "../../abi/SushiSwapV2Factory.json";
-import SushiSwapV2PairABI from "../../abi/SushiSwapV2Pair.json";
+import BiteSwapV2FactoryABI from "../../abi/BiteSwapV2Factory.json";
+import BiteSwapV2RouterABI from "../../abi/BiteSwapV2Router.json";
+import BiteSwapV2PairABI from "../../abi/BiteSwapV2Pair.json";
 import type { Address } from "viem";
+
+const TARGET_CHAIN_ID = 2090472038;
 
 // SKALE BITE V2 Precompile Addresses (fixed across all SKALE chains)
 export const PRECOMPILES = {
@@ -11,53 +14,53 @@ export const PRECOMPILES = {
 } as const;
 
 // Default CTX gas cost (0.01 sFUEL)
-// This is the recommended amount to deposit per order
 export const CTX_GAS_COST = BigInt('10000000000000000') as bigint;
 
 // Contract config per chain
 interface ChainContractConfig {
   limitOrderBook: Address;
   factory: Address;
+  router: Address;
+  pairs: {
+    USDC_WETH: Address;
+    USDC_WBTC: Address;
+    USDT_WETH: Address;
+    USDT_WBTC: Address;
+    WETH_WBTC: Address;
+  };
 }
 
-// Chain-specific contract addresses
 const CHAIN_CONTRACTS: Record<number, ChainContractConfig> = {
-  // SKALE Testnet (base-sepolia) - Chain ID: 2090472038
   2090472038: {
-    limitOrderBook: (process.env.NEXT_PUBLIC_LOB_ADDRESS ?? '0x2eDE561850b1EE5265D457016bA6018112b9D7A1') as Address,
-    factory: (process.env.NEXT_PUBLIC_FACTORY_ADDRESS ?? '0xD6818aa542B30A06F476E859ED2566AFea349d25') as Address,
-  },
-  // SKALE CTX Chain (id: 3564619) - Legacy, kept for reference
-  3564619: {
-    limitOrderBook: (process.env.NEXT_PUBLIC_LOB_ADDRESS ?? '0x0000000000000000000000000000000000000000') as Address,
-    factory: (process.env.NEXT_PUBLIC_FACTORY_ADDRESS ?? '0x0000000000000000000000000000000000000000') as Address,
+    limitOrderBook: '0xd2b09f3953842dcc7726eea3dabc5032a28acf8e' as Address,
+    factory: '0x6001dc6b74be63994c07583e0c705b7f1e7ccd7d' as Address,
+    router: '0x4aee8b2c55380e889824a731d687ad5468441546' as Address,
+    pairs: {
+      USDC_WETH: '0x8a37d79658a4d5c61b409eb8aa2631766b52ea75' as Address,
+      USDC_WBTC: '0xe5c3bfb8c260c40d9c7a7b6884fc12d1544e2375' as Address,
+      USDT_WETH: '0x239a6b8391f417a4181919ab885c5c39c072b9ff' as Address,
+      USDT_WBTC: '0x24f7caf1d55fd26e60f6c7511efd241aa738ae3b' as Address,
+      WETH_WBTC: '0x8c8e3f3c9fe7ec5bda83d1e988ff994acb5390b8' as Address,
+    },
   },
 };
 
 // Get contract addresses for a specific chain
 export const getContractForChain = (
   chainId: number,
-): ChainContractConfig => {
-  return (
-    CHAIN_CONTRACTS[chainId] ?? {
-      limitOrderBook: '0x0000000000000000000000000000000000000000' as Address,
-      factory: '0x0000000000000000000000000000000000000000' as Address,
-    }
-  );
+): ChainContractConfig | null => {
+  return CHAIN_CONTRACTS[chainId] ?? null;
 };
 
 // Legacy export for backward compatibility
-// @deprecated Use getContractForChain(chainId) instead
 export const CONTRACTS = {
   precompiles: PRECOMPILES,
-  limitOrderBook: '' as Address, // Use getContractForChain() instead
-  factory: '' as Address, // Use getContractForChain() instead
-  router: '' as Address, // Use getContractForChain() instead
+  limitOrderBook: '' as Address,
+  factory: '' as Address,
+  router: '' as Address,
   CTX_GAS_COST,
 } as const;
 
-// Legacy exports for backward compatibility
-// @deprecated Use getContractForChain() instead
 export const FACTORY_ADDRESS = '0x0000000000000000000000000000000000000000' as Address;
 export const ROUTER_ADDRESS = '0x0000000000000000000000000000000000000000' as Address;
 
@@ -66,8 +69,9 @@ export type ContractAddress = keyof typeof CONTRACTS;
 // Contract ABIs
 export const CONTRACT_ABIS = {
   limitOrderBook: ConfidentialLimitOrderBookABI,
-  factory: SushiSwapV2FactoryABI,
-  pair: SushiSwapV2PairABI,
+  factory: BiteSwapV2FactoryABI,
+  router: BiteSwapV2RouterABI,
+  pair: BiteSwapV2PairABI,
 } as const;
 
 // Event signatures for limit order events
@@ -77,5 +81,12 @@ export const EVENT_SIGNATURES = {
   OrderCancelled: "OrderCancelled(address,uint256)",
 } as const;
 
-// Alias for compatibility with eventSync service
 export const getContractConfig = getContractForChain;
+
+export function useContracts() {
+  const contracts = getContractForChain(TARGET_CHAIN_ID);
+  if (!contracts) {
+    throw new Error(`Contracts not configured for chain ${TARGET_CHAIN_ID}`);
+  }
+  return contracts;
+}

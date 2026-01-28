@@ -1,13 +1,13 @@
 import { useReadContract } from 'wagmi';
 import type { Address } from 'viem';
 import ConfidentialLimitOrderBookABI from '../../../abi/ConfidentialLimitOrderBook.json';
-import SushiSwapV2FactoryABI from '../../../abi/SushiSwapV2Factory.json';
-import SushiSwapV2PairABI from '../../../abi/SushiSwapV2Pair.json';
+import BiteSwapV2FactoryABI from '../../../abi/BiteSwapV2Factory.json';
+import BiteSwapV2PairABI from '../../../abi/BiteSwapV2Pair.json';
 import IERC20ABI from '../../../abi/IERC20.json';
 
 const LIMIT_ORDER_BOOK_ABI = ConfidentialLimitOrderBookABI.abi;
-const FACTORY_ABI = SushiSwapV2FactoryABI.abi;
-const PAIR_ABI = SushiSwapV2PairABI.abi;
+const FACTORY_ABI = BiteSwapV2FactoryABI.abi;
+const PAIR_ABI = BiteSwapV2PairABI.abi;
 const ERC20_ABI = IERC20ABI.abi;
 
 export function useOrderCount(

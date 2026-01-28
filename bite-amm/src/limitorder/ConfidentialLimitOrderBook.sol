@@ -1,8 +1,8 @@
 pragma solidity 0.8.24;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "../amm/interfaces/ISushiSwapV2Pair.sol";
-import "../amm/interfaces/ISushiSwapV2Factory.sol";
+import "../amm/interfaces/IBiteSwapV2Pair.sol";
+import "../amm/interfaces/IBiteSwapV2Factory.sol";
 import "../encryption/BITEPrecompile.sol";
 import "./LimitOrderStructs.sol";
 
@@ -21,55 +21,40 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     error InvalidOrderData();
     error OrderNotFound();
     error TransferFailed();
+    error SwapExecutionFailed(uint256 orderId, bytes reason);
 
     // ═════════════════════════════════════════════════════════════════════════
     // State
     // ═════════════════════════════════════════════════════════════════════════
-    ISushiSwapV2Factory public factory;
+    IBiteSwapV2Factory public factory;
     uint256 public constant CTX_GAS_COST = 0.01 ether;
 
     mapping(address => LimitOrderStructs.LimitOrder[]) public poolOrders;
     mapping(address => uint256) public userNonces;
     mapping(address => uint256) public userGasBalance;
+    mapping(address => bool) private _poolLocked; // Per-pool reentrancy lock
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Modifiers
+    // ═════════════════════════════════════════════════════════════════════════
+    modifier lockPool(address pool) {
+        if (_poolLocked[pool]) revert("Pool locked");
+        _poolLocked[pool] = true;
+        _;
+        _poolLocked[pool] = false;
+    }
 
     // ═════════════════════════════════════════════════════════════════════════
     // Events
     // ═════════════════════════════════════════════════════════════════════════
-    event OrderSubmitted(
-        address indexed maker,
-        address indexed pool,
-        uint256 orderId,
-        uint256 nonce
-    );
-    event OrderCancelled(
-        address indexed maker,
-        address indexed pool,
-        uint256 orderId
-    );
-    event OrderExpired(
-        address indexed maker,
-        address indexed pool,
-        uint256 orderId
-    );
-    event OrderFilled(
-        address indexed maker,
-        address indexed pool,
-        uint256 orderId,
-        uint256 amountOut
-    );
-    event CTXSubmitted(
-        address indexed pool,
-        uint256 orderId,
-        address ctxSender
-    );
-    event GasDeposited(
-        address indexed user,
-        uint256 amount
-    );
-    event GasWithdrawn(
-        address indexed user,
-        uint256 amount
-    );
+    event OrderSubmitted(address indexed maker, address indexed pool, uint256 orderId, uint256 nonce);
+    event OrderCancelled(address indexed maker, address indexed pool, uint256 orderId);
+    event OrderExpired(address indexed maker, address indexed pool, uint256 orderId);
+    event OrderFilled(address indexed maker, address indexed pool, uint256 orderId, uint256 amountOut);
+    event SwapFailed(address indexed maker, address indexed pool, uint256 indexed orderId, bytes reason);
+    event CTXSubmitted(address indexed pool, uint256 orderId, address ctxSender);
+    event GasDeposited(address indexed user, uint256 amount);
+    event GasWithdrawn(address indexed user, uint256 amount);
     event FactorySet(address indexed factory);
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -84,7 +69,7 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     /// @param _factory Address of the AMM factory
     function setFactory(address _factory) external {
         if (address(factory) != address(0) && msg.sender != address(this)) revert NotFactory();
-        factory = ISushiSwapV2Factory(_factory);
+        factory = IBiteSwapV2Factory(_factory);
         emit FactorySet(_factory);
     }
 
@@ -102,7 +87,7 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     function withdrawGas(uint256 amount) external nonReentrant {
         if (userGasBalance[msg.sender] < amount) revert InsufficientGasBalance();
         userGasBalance[msg.sender] -= amount;
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        (bool success,) = payable(msg.sender).call{value: amount}("");
         if (!success) revert TransferFailed();
         emit GasWithdrawn(msg.sender, amount);
     }
@@ -134,21 +119,23 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
         uint256 nonce = ++userNonces[msg.sender];
         orderId = poolOrders[pool].length;
 
-        poolOrders[pool].push(LimitOrderStructs.LimitOrder({
-            maker: msg.sender,
-            pool: pool,
-            encryptedTargetPrice: encryptedTargetPrice,
-            encryptedAmount: encryptedAmount,
-            direction: direction,
-            deadline: deadline,
-            nonce: nonce,
-            active: true
-        }));
+        poolOrders[pool].push(
+            LimitOrderStructs.LimitOrder({
+                maker: msg.sender,
+                pool: pool,
+                encryptedTargetPrice: encryptedTargetPrice,
+                encryptedAmount: encryptedAmount,
+                direction: direction,
+                deadline: deadline,
+                nonce: nonce,
+                active: true
+            })
+        );
 
         emit OrderSubmitted(msg.sender, pool, orderId, nonce);
     }
 
-    /// @notice Cancel an active order
+    /// @notice Cancel an active order and refund gas deposit
     /// @param pool Pool address
     /// @param orderId Order ID
     function cancelOrder(address pool, uint256 orderId) external nonReentrant {
@@ -157,6 +144,8 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
         if (!order.active) revert OrderInactive();
 
         order.active = false;
+        uint256 refund = CTX_GAS_COST;
+        userGasBalance[msg.sender] += refund;
         emit OrderCancelled(msg.sender, pool, orderId);
     }
 
@@ -171,11 +160,7 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     /// @param pool Pool address
     /// @param orderId Order ID
     /// @return order Order details
-    function getOrder(address pool, uint256 orderId)
-        external
-        view
-        returns (LimitOrderStructs.LimitOrder memory order)
-    {
+    function getOrder(address pool, uint256 orderId) external view returns (LimitOrderStructs.LimitOrder memory order) {
         order = poolOrders[pool][orderId];
     }
 
@@ -183,15 +168,15 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     // Order Execution
     // ═════════════════════════════════════════════════════════════════════════
     /// @notice Check orders after a swap - triggers individual CTX for each active order
-    /// @dev Called by SushiSwapV2Pair.swap() via the swap hook
+    /// @dev Called by BiteSwapV2Pair.swap() via the swap hook
     /// @param pool The AMM pair address
-    function checkOrders(address pool) external nonReentrant {
+    function checkOrders(address pool) external lockPool(pool) {
         if (!_isValidPool(pool)) revert InvalidPool();
 
         LimitOrderStructs.LimitOrder[] storage orders = poolOrders[pool];
         uint256 ordersLength = orders.length;
 
-        for (uint256 i = 0; i < ordersLength; ) {
+        for (uint256 i = 0; i < ordersLength;) {
             LimitOrderStructs.LimitOrder storage order = orders[i];
 
             // Skip inactive orders
@@ -220,10 +205,18 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
                 continue;
             }
 
-            // Deduct gas
-            userGasBalance[order.maker] -= CTX_GAS_COST;
+            // Check gas balance first - skip if insufficient funds
+            uint256 gasCost = CTX_GAS_COST;
+            if (userGasBalance[order.maker] < gasCost) {
+                unchecked {
+                    ++i;
+                }
+                continue;
+            }
 
-            // Submit CTX for this order
+            // Deduct gas and submit CTX
+            userGasBalance[order.maker] -= gasCost;
+
             bytes[] memory encryptedArgs = new bytes[](2);
             encryptedArgs[0] = order.encryptedTargetPrice;
             encryptedArgs[1] = order.encryptedAmount;
@@ -233,11 +226,9 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
             plaintextArgs[1] = abi.encode(order.direction);
             plaintextArgs[2] = abi.encode(i);
 
-            bytes memory data = abi.encode(encryptedArgs, plaintextArgs);
-            address ctxSender = BITEPrecompile.submitCTX(300000, data);
+            address ctxSender = BITEPrecompile.submitCTX(encryptedArgs, plaintextArgs);
 
-            // Top up CTX sender with gas
-            (bool success, ) = payable(ctxSender).call{value: CTX_GAS_COST}("");
+            (bool success,) = payable(ctxSender).call{value: gasCost}("");
             if (!success) revert TransferFailed();
 
             emit CTXSubmitted(pool, i, ctxSender);
@@ -252,10 +243,7 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     /// @dev Only callable by BITE V2 system
     /// @param decryptedArgs Decrypted values [targetPrice, amount]
     /// @param plainArgs Plaintext values [pool, direction, orderId]
-    function onDecrypt(
-        bytes[] calldata decryptedArgs,
-        bytes[] calldata plainArgs
-    ) external nonReentrant {
+    function onDecrypt(bytes[] calldata decryptedArgs, bytes[] calldata plainArgs) external nonReentrant {
         if (decryptedArgs.length != 2) revert InvalidOrderData();
         if (plainArgs.length != 3) revert InvalidOrderData();
 
@@ -289,9 +277,18 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
         (bool met, uint256 outputAmount) = _checkPriceCondition(pool, targetPrice, amount, direction);
 
         if (met) {
-            _executeSwap(pool, amount, direction, order.maker);
-            order.active = false;
-            emit OrderFilled(order.maker, pool, orderId, outputAmount);
+            // Attempt swap with safe error handling
+            (bool success, bytes memory errorData) = _executeSwap(pool, amount, direction, order.maker);
+
+            if (success) {
+                // Swap succeeded - mark order as filled
+                order.active = false;
+                emit OrderFilled(order.maker, pool, orderId, outputAmount);
+            } else {
+                // Swap failed - order remains active for retry
+                // User can cancel manually or wait for next price check
+                emit SwapFailed(order.maker, pool, orderId, errorData);
+            }
         }
     }
 
@@ -305,13 +302,12 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     /// @param direction Swap direction
     /// @return met Whether condition met
     /// @return outputAmount Expected output amount
-    function _checkPriceCondition(
-        address pool,
-        uint256 targetPrice,
-        uint256 amount,
-        bool direction
-    ) internal view returns (bool met, uint256 outputAmount) {
-        (uint112 reserve0, uint112 reserve1, ) = ISushiSwapV2Pair(pool).getReserves();
+    function _checkPriceCondition(address pool, uint256 targetPrice, uint256 amount, bool direction)
+        internal
+        view
+        returns (bool met, uint256 outputAmount)
+    {
+        (uint112 reserve0, uint112 reserve1,) = IBiteSwapV2Pair(pool).getReserves();
 
         if (direction) {
             // token0 → token1
@@ -329,11 +325,11 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     /// @param reserveIn Input reserve
     /// @param reserveOut Output reserve
     /// @return amountOut Output amount (0.3% fee)
-    function _getAmountOut(
-        uint256 amountIn,
-        uint256 reserveIn,
-        uint256 reserveOut
-    ) internal pure returns (uint256 amountOut) {
+    function _getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut)
+        internal
+        pure
+        returns (uint256 amountOut)
+    {
         if (amountIn == 0) return 0;
         if (reserveIn == 0 || reserveOut == 0) return 0;
 
@@ -344,22 +340,35 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     }
 
     /// @notice Execute swap on the pool
+    /// @dev Uses try/catch to prevent reverts from bubbling up
     /// @param pool Pool address
     /// @param amount Input amount
     /// @param direction Swap direction
     /// @param maker Recipient
-    function _executeSwap(
-        address pool,
-        uint256 amount,
-        bool direction,
-        address maker
-    ) internal {
+    /// @return success True if swap succeeded
+    /// @return errorData Error data if swap failed
+    function _executeSwap(address pool, uint256 amount, bool direction, address maker)
+        internal
+        returns (bool success, bytes memory errorData)
+    {
         if (direction) {
             // token0 → token1: receive token1
-            ISushiSwapV2Pair(pool).swap(0, amount, maker, "");
+            try IBiteSwapV2Pair(pool).swap(0, amount, maker, "") {
+                return (true, "");
+            } catch Error(string memory reason) {
+                return (false, bytes(reason));
+            } catch (bytes memory lowLevelData) {
+                return (false, lowLevelData);
+            }
         } else {
             // token1 → token0: receive token0
-            ISushiSwapV2Pair(pool).swap(amount, 0, maker, "");
+            try IBiteSwapV2Pair(pool).swap(amount, 0, maker, "") {
+                return (true, "");
+            } catch Error(string memory reason) {
+                return (false, bytes(reason));
+            } catch (bytes memory lowLevelData) {
+                return (false, lowLevelData);
+            }
         }
     }
 
@@ -373,8 +382,8 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
         try factory.getPair(address(0), address(0)) returns (address) {
             // If factory is set, verify pool was created by it
             // by checking if it has a valid token0/token1
-            address token0 = ISushiSwapV2Pair(pool).token0();
-            address token1 = ISushiSwapV2Pair(pool).token1();
+            address token0 = IBiteSwapV2Pair(pool).token0();
+            address token1 = IBiteSwapV2Pair(pool).token1();
             return factory.getPair(token0, token1) == pool;
         } catch {
             return false;

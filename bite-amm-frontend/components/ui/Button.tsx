@@ -2,23 +2,24 @@ import { ButtonHTMLAttributes, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'error';
+  variant?: 'primary' | 'secondary' | 'accent' | 'outline' | 'ghost' | 'error';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
 }
 
 const buttonVariants = {
-  primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
-  secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/90',
-  outline: 'border border-border bg-transparent hover:bg-accent hover:text-accent-foreground',
-  ghost: 'bg-transparent hover:bg-accent hover:text-accent-foreground',
-  error: 'bg-error text-error-foreground hover:bg-error/90',
+  primary: 'bg-primary text-primary-foreground border-border hover:bg-primary/90',
+  secondary: 'bg-secondary text-secondary-foreground border-border hover:bg-secondary/90',
+  accent: 'bg-accent text-accent-foreground border-border hover:bg-accent/90',
+  outline: 'bg-transparent text-foreground border-border hover:bg-muted hover:border-foreground',
+  ghost: 'bg-transparent text-foreground border-transparent hover:bg-muted',
+  error: 'bg-error text-error-foreground border-border hover:bg-error/90',
 };
 
 const buttonSizes = {
-  sm: 'h-8 px-3 text-sm',
-  md: 'h-10 px-4 text-base',
-  lg: 'h-12 px-6 text-lg',
+  sm: 'h-9 px-4 text-sm font-bold',
+  md: 'h-11 px-6 text-base font-bold',
+  lg: 'h-13 px-8 text-lg font-extrabold',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -39,34 +40,35 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || isLoading}
         className={cn(
-          'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50',
+          // Base styles
+          'inline-flex items-center justify-center gap-2 whitespace-nowrap font-bold transition-all cursor-pointer',
+          // Neo-brutalist border and shadow
+          'border-3 border-solid',
+          'brutalist-shadow',
+          // Focus styles
+          'focus-visible:outline-none focus-visible:box-shadow-focus',
+          // Disabled styles
+          'disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed disabled:brutalist-disabled',
+          // Variant and size
           buttonVariants[variant],
           buttonSizes[size],
+          // Rounded corners with brutalist feel
+          'rounded-md',
           className
         )}
+        style={{
+          boxShadow: disabled || isLoading ? 'none' : '4px 4px 0px 0px hsl(var(--border))',
+        }}
         {...props}
       >
         {isLoading && (
-          <svg
-            className="h-4 w-4 animate-spin"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
+          <div
+            className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+            role="status"
+            aria-label="Loading"
           >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
+            <span className="sr-only">Loading...</span>
+          </div>
         )}
         {children}
       </button>

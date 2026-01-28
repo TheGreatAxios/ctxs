@@ -1,115 +1,63 @@
 pragma solidity 0.8.24;
 
 import "forge-std/Script.sol";
-import "../src/amm/SushiSwapV2Factory.sol";
-import "../src/amm/SushiSwapV2Pair.sol";
-import "../src/amm/interfaces/ISushiSwapV2Pair.sol";
+import "../src/amm/BiteSwapV2Factory.sol";
+import "../src/amm/BiteSwapV2Router.sol";
 import "../src/limitorder/ConfidentialLimitOrderBook.sol";
-import "../src/MockToken.sol";
+import "../src/amm/BiteSwapV2Pair.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract DeployScript is Script {
-    SushiSwapV2Factory factory;
-    ConfidentialLimitOrderBook lob;
+    address constant USDC = 0xC8EEde488d7152CED970D9e9621D9330b64Cfd24;
+    address constant USDT = 0x7433ddb971F6a29e24bac69E2d86396201A7aa78;
+    address constant WETH = 0x4B0D38a8bC57e78Eb0Afa5eeA1A1DA30072134ab;
+    address constant WBTC = 0x09C6e0Fe49080e10DF7db8A0c8d64660C4d55D86;
 
-    // Tokens
-    MockToken usdc;
-    MockToken usdt;
-    MockToken weth;
-    MockToken wbtc;
-
-    // Pairs
-    address usdcWethPair;
-    address usdcWbtcPair;
-    address usdtWethPair;
-    address usdtWbtcPair;
-    address wethWbtcPair;
-
-    // Liquidity amounts (with proper decimals)
-    uint256 constant LIQUIDITY_AMOUNT = 1_000_000 * 10**18; // Base amount for 18 decimals
-
-    function run() external {
+    function run() external returns (address factory, address router, address lob) {
         vm.startBroadcast();
 
-        // Deploy tokens with proper decimals
-        usdc = new MockToken("USD Coin", "USDC", true, 6);
-        usdt = new MockToken("Tether USD", "USDT", true, 6);
-        weth = new MockToken("Wrapped Ether", "WETH", true, 18);
-        wbtc = new MockToken("Wrapped BTC", "WBTC", true, 8);
+        // Deploy contracts
+        BiteSwapV2Factory _factory = new BiteSwapV2Factory();
+        BiteSwapV2Router _router = new BiteSwapV2Router(_factory, WETH);
+        ConfidentialLimitOrderBook _lob = new ConfidentialLimitOrderBook();
 
-        // Deploy factory
-        factory = new SushiSwapV2Factory();
+        // Configure
+        _lob.setFactory(address(_factory));
+        _factory.setLimitOrderBook(address(_lob));
 
-        // Deploy limit order book
-        lob = new ConfidentialLimitOrderBook();
+        // Create pairs
+        address usdcWeth = _factory.createPair(USDC, WETH);
+        address usdcWbtc = _factory.createPair(USDC, WBTC);
+        address usdtWeth = _factory.createPair(USDT, WETH);
+        address usdtWbtc = _factory.createPair(USDT, WBTC);
+        address wethWbtc = _factory.createPair(WETH, WBTC);
 
-        // Set factory in LOB
-        lob.setFactory(address(factory));
-
-        // Set LOB in factory
-        factory.setLimitOrderBook(address(lob));
-
-        // Create all pairs
-        usdcWethPair = factory.createPair(address(usdc), address(weth));
-        usdcWbtcPair = factory.createPair(address(usdc), address(wbtc));
-        usdtWethPair = factory.createPair(address(usdt), address(weth));
-        usdtWbtcPair = factory.createPair(address(usdt), address(wbtc));
-        wethWbtcPair = factory.createPair(address(weth), address(wbtc));
-
-        // Mint extra tokens to msg.sender for liquidity
-        uint256 mintAmount = 100_000_000 * 10**18; // 100M for 18 decimals
-        usdc.mint(msg.sender, 100_000_000 * 10**6);
-        usdt.mint(msg.sender, 100_000_000 * 10**6);
-        weth.mint(msg.sender, mintAmount);
-        wbtc.mint(msg.sender, 100_000_000 * 10**8);
-
-        // Add liquidity to USDC/WETH
-        _addLiquidity(usdc, weth, usdcWethPair, 1_000_000 * 10**6, 500 * 10**18);
-        // Add liquidity to USDC/WBTC
-        _addLiquidity(usdc, wbtc, usdcWbtcPair, 1_000_000 * 10**6, 50 * 10**8);
-        // Add liquidity to USDT/WETH
-        _addLiquidity(usdt, weth, usdtWethPair, 1_000_000 * 10**6, 500 * 10**18);
-        // Add liquidity to USDT/WBTC
-        _addLiquidity(usdt, wbtc, usdtWbtcPair, 1_000_000 * 10**6, 50 * 10**8);
-        // Add liquidity to WETH/WBTC
-        _addLiquidity(weth, wbtc, wethWbtcPair, 100 * 10**18, 5 * 10**8);
+        // Add liquidity
+        _addLiquidity(USDC, WETH, usdcWeth, 1_000_000 * 10 ** 6, 500 * 10 ** 18);
+        _addLiquidity(USDC, WBTC, usdcWbtc, 1_000_000 * 10 ** 6, 50 * 10 ** 8);
+        _addLiquidity(USDT, WETH, usdtWeth, 1_000_000 * 10 ** 6, 500 * 10 ** 18);
+        _addLiquidity(USDT, WBTC, usdtWbtc, 1_000_000 * 10 ** 6, 50 * 10 ** 8);
+        _addLiquidity(WETH, WBTC, wethWbtc, 100 * 10 ** 18, 5 * 10 ** 8);
 
         vm.stopBroadcast();
 
-        _logDeployment();
+        factory = address(_factory);
+        router = address(_router);
+        lob = address(_lob);
+
+        console.log("Factory:", factory);
+        console.log("Router:", router);
+        console.log("LOB:", lob);
+        console.log("USDC/WETH:", usdcWeth);
+        console.log("USDC/WBTC:", usdcWbtc);
+        console.log("USDT/WETH:", usdtWeth);
+        console.log("USDT/WBTC:", usdtWbtc);
+        console.log("WETH/WBTC:", wethWbtc);
     }
 
-    function _addLiquidity(
-        MockToken token0,
-        MockToken token1,
-        address pairAddress,
-        uint256 amount0,
-        uint256 amount1
-    ) internal {
-        // Transfer tokens to pair
-        token0.transfer(pairAddress, amount0);
-        token1.transfer(pairAddress, amount1);
-
-        // Mint LP tokens
-        ISushiSwapV2Pair(pairAddress).mint(msg.sender);
+    function _addLiquidity(address token0, address token1, address pair, uint256 amount0, uint256 amount1) internal {
+        IERC20(token0).transfer(pair, amount0);
+        IERC20(token1).transfer(pair, amount1);
+        BiteSwapV2Pair(pair).mint(msg.sender);
     }
-
-    function _logDeployment() internal view {
-        console.log("=== Tokens ===");
-        console.log("USDC (6 decimals):", address(usdc));
-        console.log("USDT (6 decimals):", address(usdt));
-        console.log("WETH (18 decimals):", address(weth));
-        console.log("WBTC (8 decimals):", address(wbtc));
-
-        console.log("\n=== Core Contracts ===");
-        console.log("Factory:", address(factory));
-        console.log("LimitOrderBook:", address(lob));
-
-        console.log("\n=== Pairs ===");
-        console.log("USDC/WETH:", usdcWethPair);
-        console.log("USDC/WBTC:", usdcWbtcPair);
-        console.log("USDT/WETH:", usdtWethPair);
-        console.log("USDT/WBTC:", usdtWbtcPair);
-        console.log("WETH/WBTC:", wethWbtcPair);
-    }
-
 }

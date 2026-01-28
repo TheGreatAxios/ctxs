@@ -1,121 +1,213 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useAccount, useBalance } from 'wagmi';
-import { ArrowDownUp, AlertCircle } from 'lucide-react';
+import { useAccount, useBalance, useReadContract, useSwitchChain } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { ArrowDownUp, AlertCircle, Settings, Zap, DollarSign, Eye, EyeOff } from 'lucide-react';
 import { cn, formatBigInt, parseBigInt } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TokenSelector, TokenInfo } from '@/components/dex/TokenSelector';
-import { useSwap, useApprove } from '@/lib/hooks/useSwap';
+import { useSwap, useApprove, calculateAmountOut } from '@/lib/hooks/useSwap';
 import { useTokenAllowance, useReserves } from '@/lib/hooks/useContractRead';
-import { useCoinbasePrice } from '@/lib/hooks/useCoinbasePrice';
+import { useTokenPriceByAddress } from '@/lib/hooks/useTokenPrices';
 import { usePairAddress } from '@/lib/hooks/usePairAddress';
+import { useSwapAmounts } from '@/context/SwapAmountsContext';
+import BiteSwapV2PairABI from '../../abi/BiteSwapV2Pair.json';
 
-const SLIPPAGE_TOLERANCE = 0.005; // 0.5%
 const DEADLINE_MINUTES = 20;
 
 interface SwapFormProps {
   factoryAddress?: `0x${string}`;
+  routerAddress?: `0x${string}`;
   availableTokens?: TokenInfo[];
 }
 
-export function SwapForm({ factoryAddress, availableTokens = [] }: SwapFormProps) {
-  const { address, chain } = useAccount();
+const TARGET_CHAIN_ID = 2090472038;
+
+// Safe number formatter to handle NaN
+const safeFixed = (value: number | null | undefined, decimals: number): string => {
+  if (value === null || value === undefined || isNaN(value)) return '---';
+  return value.toFixed(decimals);
+};
+
+export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }: SwapFormProps) {
+  const { address, chain, isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
+  const { switchChain } = useSwitchChain();
+  const { amounts: cachedAmounts, setAmounts: setCachedAmounts } = useSwapAmounts();
   const [fromToken, setFromToken] = useState<TokenInfo | null>(null);
   const [toToken, setToToken] = useState<TokenInfo | null>(null);
-  const [fromAmount, setFromAmount] = useState('');
-  const [toAmount, setToAmount] = useState('');
-  const [slippage, setSlippage] = useState('0.5');
+  const [slippage, setSlippage] = useState('0.1');
+  const [showSlippageSettings, setShowSlippageSettings] = useState(false);
+  const [useEncryption, setUseEncryption] = useState(true); // Default: BITE encrypted
   const [error, setError] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
 
-  const { swap, isPending: swapPending, isConfirming } = useSwap();
-  const { approve: approveToken, isPending: approvePending } = useApprove();
+  const { swap, isPending: swapPending, isConfirming, error: swapError, clearError: clearSwapError } = useSwap();
+  const { approve: approveToken, isPending: approvePending, error: approveError, clearError: clearApproveError, receipt: approveReceipt } = useApprove();
 
-  // Look up pair address from factory based on selected tokens
   const { pairAddress, isLoading: isLoadingPair } = usePairAddress(
     factoryAddress,
     fromToken?.address,
     toToken?.address
   );
 
-  // Get balances
   const { data: fromBalance } = useBalance({
     address: address,
     token: fromToken?.address,
   });
 
-  // Get USD prices
-  const { data: fromUsdPrice } = useCoinbasePrice(fromToken?.coinbaseId);
-  const { data: toUsdPrice } = useCoinbasePrice(toToken?.coinbaseId);
+  // Fetch live prices from CoinGecko (global context)
+  const fromUsdPrice = useTokenPriceByAddress(fromToken?.address);
+  const toUsdPrice = useTokenPriceByAddress(toToken?.address);
 
   // Calculate USD values for display
   const fromUsdValue = useMemo(() => {
-    if (!fromAmount || !fromUsdPrice) return null;
-    const amount = parseFloat(fromAmount);
-    return amount * fromUsdPrice;
-  }, [fromAmount, fromUsdPrice]);
+    if (!cachedAmounts.fromAmount || fromUsdPrice === undefined) return null;
+    const amount = parseFloat(cachedAmounts.fromAmount);
+    if (isNaN(amount)) return null;
+    const value = amount * fromUsdPrice;
+    return isNaN(value) ? null : value;
+  }, [cachedAmounts.fromAmount, fromUsdPrice]);
 
   const toUsdValue = useMemo(() => {
-    if (!toAmount || !toUsdPrice) return null;
-    const amount = parseFloat(toAmount);
-    return amount * toUsdPrice;
-  }, [toAmount, toUsdPrice]);
+    if (!cachedAmounts.toAmount || toUsdPrice === undefined) return null;
+    const amount = parseFloat(cachedAmounts.toAmount);
+    if (isNaN(amount)) return null;
+    const value = amount * toUsdPrice;
+    return isNaN(value) ? null : value;
+  }, [cachedAmounts.toAmount, toUsdPrice]);
 
-  // Get allowance (allow pair to spend tokens)
   const { data: allowanceRaw, refetch: refetchAllowance } = useTokenAllowance(
     fromToken?.address ?? '0x0000000000000000000000000000000000000001',
     address ?? '0x0000000000000000000000000000000000000001',
-    pairAddress ?? '0x0000000000000000000000000000000000000001'
+    routerAddress ?? '0x0000000000000000000000000000000000000001'
   );
 
   const allowance = allowanceRaw as bigint | undefined;
 
-  // Calculate output amount (simplified AMM formula)
+  const { data: reserves } = useReadContract({
+    address: pairAddress,
+    abi: BiteSwapV2PairABI.abi,
+    functionName: 'getReserves',
+    query: {
+      enabled: !!pairAddress && pairAddress !== '0x0000000000000000000000000000000000000000',
+    },
+  }) as { data: readonly [bigint, bigint, bigint] | undefined };
+
+  const { data: token0 } = useReadContract({
+    address: pairAddress,
+    abi: BiteSwapV2PairABI.abi,
+    functionName: 'token0',
+    query: {
+      enabled: !!pairAddress && pairAddress !== '0x0000000000000000000000000000000000000000',
+    },
+  });
+
   const calculatedOutput = useMemo(() => {
-    if (!fromAmount || !fromToken || !toToken) return null;
-    // This is a simplified calculation. In production, you'd query the router
-    // or use a price oracle for accurate pricing
-    const amountIn = parseBigInt(fromAmount, fromToken.decimals ?? 18);
-    // Mock calculation - replace with actual router quote
-    return amountIn * BigInt(99) / BigInt(100); // Assume 1% fee
-  }, [fromAmount, fromToken, toToken]);
+    if (!cachedAmounts.fromAmount || !fromToken || !toToken || !reserves || !token0) return null;
+    const amountIn = parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18);
+
+    const isToken0In = fromToken.address.toLowerCase() === (token0 as string).toLowerCase();
+    const reserveIn = isToken0In ? reserves[0] : reserves[1];
+    const reserveOut = isToken0In ? reserves[1] : reserves[0];
+
+    if (reserveIn === 0n || reserveOut === 0n) return null;
+
+    return calculateAmountOut(amountIn, reserveIn, reserveOut);
+  }, [cachedAmounts.fromAmount, fromToken, toToken, reserves, token0]);
+
+  const calculatedInput = useMemo(() => {
+    if (!cachedAmounts.toAmount || !fromToken || !toToken || !reserves || !token0) return null;
+    const amountOut = parseBigInt(cachedAmounts.toAmount, toToken.decimals ?? 18);
+
+    const isToken0In = fromToken.address.toLowerCase() === (token0 as string).toLowerCase();
+    const reserveIn = isToken0In ? reserves[0] : reserves[1];
+    const reserveOut = isToken0In ? reserves[1] : reserves[0];
+
+    if (reserveIn === 0n || reserveOut === 0n) return null;
+
+    const amountOutWithFee = amountOut * 997n;
+    const numerator = reserveIn * 1000n * amountOut;
+    const denominator = reserveOut * 997n - amountOutWithFee;
+
+    if (denominator <= 0n) return null;
+    return (numerator / denominator) + 1n;
+  }, [cachedAmounts.toAmount, fromToken, toToken, reserves, token0]);
 
   const needsApproval = useMemo(() => {
-    if (!fromAmount || !fromToken || allowance === undefined || !pairAddress) return false;
-    const amountIn = parseBigInt(fromAmount, fromToken.decimals ?? 18);
-    return allowance < amountIn;
-  }, [fromAmount, fromToken, allowance, pairAddress]);
+    if (!cachedAmounts.fromAmount || !fromToken || allowance === undefined || !routerAddress) return false;
+    const amountIn = parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18);
+    const needs = allowance < amountIn;
+    console.log("needsApproval check:", { allowance: allowance.toString(), amountIn: amountIn.toString(), needs, fromToken: fromToken.symbol });
+    return needs;
+  }, [cachedAmounts.fromAmount, fromToken, allowance, routerAddress]);
 
-  // Update output when input changes
   useEffect(() => {
-    if (calculatedOutput && toToken) {
-      setToAmount(formatBigInt(calculatedOutput, toToken.decimals ?? 18));
-    } else {
-      setToAmount('');
+    if (editingField === 'from') {
+      if (calculatedOutput && toToken) {
+        setCachedAmounts({ toAmount: formatBigInt(calculatedOutput, toToken.decimals ?? 18) });
+      }
+      // Only clear toAmount if editing from and no output (not during token changes)
+      else if (fromToken && toToken) {
+        setCachedAmounts({ toAmount: '' });
+      }
+    } else if (editingField === 'to') {
+      if (calculatedInput && fromToken) {
+        setCachedAmounts({ fromAmount: formatBigInt(calculatedInput, fromToken.decimals ?? 18) });
+      }
+      // Only clear fromAmount if editing to and no input (not during token changes)
+      else if (fromToken && toToken) {
+        setCachedAmounts({ fromAmount: '' });
+      }
     }
-  }, [calculatedOutput, toToken]);
+  }, [calculatedOutput, calculatedInput, toToken, fromToken, editingField, setCachedAmounts]);
+
+  // Update error from hooks
+  useEffect(() => {
+    if (swapError) {
+      setError(swapError);
+    }
+  }, [swapError]);
+
+  useEffect(() => {
+    if (approveError) {
+      setError(approveError);
+    }
+  }, [approveError]);
+
+  // Refetch allowance when approval receipt is received
+  useEffect(() => {
+    if (approveReceipt && approveReceipt.status === "success") {
+      console.log("Approval confirmed, refetching allowance");
+      refetchAllowance();
+    }
+  }, [approveReceipt]);
 
   const handleSwapTokens = () => {
     setFromToken(toToken);
     setToToken(fromToken);
-    setFromAmount(toAmount);
-    setToAmount(fromAmount);
+    setCachedAmounts({
+      fromAmount: cachedAmounts.toAmount,
+      toAmount: cachedAmounts.fromAmount,
+    });
   };
 
   const handleMax = () => {
     if (fromBalance) {
       const formatted = formatBigInt(fromBalance.value, fromBalance.decimals);
-      setFromAmount(formatted);
+      setCachedAmounts({ fromAmount: formatted });
     }
   };
 
   const validateSwap = () => {
     if (!address) return 'Please connect your wallet';
     if (!fromToken || !toToken) return 'Please select both tokens';
-    if (!fromAmount || parseFloat(fromAmount) <= 0) return 'Enter an amount';
+    if (!cachedAmounts.fromAmount || parseFloat(cachedAmounts.fromAmount) <= 0) return 'Enter an amount';
     if (fromToken?.address === toToken?.address) return 'Cannot swap same token';
-    if (!pairAddress) return 'Trading pair does not exist';
+    if (!routerAddress || routerAddress === '0x0000000000000000000000000000000000000000') return 'Router not configured';
+    if (!pairAddress || pairAddress === '0x0000000000000000000000000000000000000000') return 'No route found';
     return null;
   };
 
@@ -126,16 +218,17 @@ export function SwapForm({ factoryAddress, availableTokens = [] }: SwapFormProps
       return;
     }
 
-    if (!fromToken || !pairAddress) return;
-
-    try {
-      setError(null);
-      const amountIn = parseBigInt(fromAmount, fromToken.decimals ?? 18);
-      await approveToken(fromToken.address, pairAddress, amountIn);
-      refetchAllowance();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Approval failed');
+    if (!fromToken || !routerAddress) {
+      setError('Router address missing');
+      return;
     }
+
+    setError(null);
+    clearSwapError();
+    const amountIn = parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18);
+    await approveToken(fromToken.address, routerAddress, amountIn);
+    // Refetch immediately (optimistic) - will be refetched again when receipt confirms
+    setTimeout(() => refetchAllowance(), 1000);
   };
 
   const handleSwap = async () => {
@@ -145,38 +238,56 @@ export function SwapForm({ factoryAddress, availableTokens = [] }: SwapFormProps
       return;
     }
 
-    if (!fromToken || !toToken || !pairAddress || !address) return;
+    if (!fromToken || !toToken || !routerAddress || !address) return;
 
-    try {
-      setError(null);
-      const amountIn = parseBigInt(fromAmount, fromToken.decimals ?? 18);
-      const amountOutMin = calculatedOutput
-        ? (calculatedOutput * BigInt((1 - SLIPPAGE_TOLERANCE) * 10000)) / BigInt(10000)
-        : BigInt(0);
+    setError(null);
+    clearApproveError();
+    const amountIn = parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18);
+    // Use the slippage state value (e.g., "0.1" = 0.1%, "1" = 1%)
+    const slippageDecimal = Number.parseFloat(slippage) / 100;
+    const amountOutMin = calculatedOutput
+      ? (calculatedOutput * BigInt(Math.floor((1 - slippageDecimal) * 10000))) / BigInt(10000)
+      : BigInt(0);
 
-      await swap({
-        pairAddress,
-        tokenIn: fromToken.address,
-        tokenOut: toToken.address,
-        amountIn,
-        amountOutMin,
-        recipient: address,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Swap failed');
+    await swap({
+      routerAddress,
+      tokenIn: fromToken.address,
+      tokenOut: toToken.address,
+      amountIn,
+      amountOutMin,
+      recipient: address,
+    });
+  };
+
+  const isWrongChain = chain && chain.id !== TARGET_CHAIN_ID;
+  const needsGetStarted = !isConnected || isWrongChain;
+
+  const handleGetStarted = async () => {
+    if (!isConnected) {
+      openConnectModal?.();
+    } else if (isWrongChain && switchChain) {
+      switchChain({ chainId: TARGET_CHAIN_ID });
     }
   };
 
   const actionButton = () => {
-    if (!address) return null; // RainbowKit handles connect button
+    if (needsGetStarted) {
+      return (
+        <Button
+          onClick={handleGetStarted}
+          className="w-full !h-11 text-sm font-extrabold uppercase"
+        >
+          {isWrongChain ? 'Switch Network' : 'Get Started'}
+        </Button>
+      );
+    }
     if (isLoadingPair) {
       return (
         <Button
           disabled
-          className="w-full"
-          size="lg"
+          className="w-full !h-11 text-sm"
         >
-          Loading pair...
+          Loading...
         </Button>
       );
     }
@@ -185,8 +296,8 @@ export function SwapForm({ factoryAddress, availableTokens = [] }: SwapFormProps
         <Button
           onClick={handleApprove}
           isLoading={approvePending}
-          className="w-full"
-          size="lg"
+          className="w-full !h-11 text-sm font-extrabold uppercase"
+          variant="secondary"
         >
           Approve {fromToken?.symbol}
         </Button>
@@ -196,138 +307,340 @@ export function SwapForm({ factoryAddress, availableTokens = [] }: SwapFormProps
       <Button
         onClick={handleSwap}
         isLoading={swapPending || isConfirming}
-        disabled={!fromAmount || !toAmount || !pairAddress}
-        className="w-full"
-        size="lg"
+        disabled={!cachedAmounts.fromAmount || !cachedAmounts.toAmount || !routerAddress}
+        className="w-full !h-11 text-sm font-extrabold uppercase"
       >
-        {isConfirming ? 'Confirming...' : swapPending ? 'Swapping...' : 'Swap'}
+        {isConfirming ? 'Confirming...' : swapPending ? 'Swapping...' : (
+          <span className="flex items-center gap-1.5">
+            <Zap className="h-4 w-4" />
+            Swap
+          </span>
+        )}
       </Button>
     );
   };
 
+  const hasNoRoute = fromToken && toToken && (!pairAddress || pairAddress === '0x0000000000000000000000000000000000000000');
+
   return (
-    <div className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-card p-6">
+    <div className="flex w-full max-w-md flex-col gap-3 bg-white border-3 border-solid border-black rounded-2xl p-5 brutalist-shadow-lg">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-foreground">Swap</h2>
-        <div className="text-sm text-muted-foreground">
-          Slippage: {slippage}%
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        {/* From Token */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">From</span>
-            {fromBalance && (
-              <button
-                type="button"
-                onClick={handleMax}
-                className="text-xs text-primary hover:underline"
-              >
-                Max: {formatBigInt(fromBalance.value, fromBalance.decimals)}
-              </button>
-            )}
-          </div>
-          <TokenSelector
-            selectedToken={fromToken}
-            onSelect={setFromToken}
-            label="Select token"
-            availableTokens={availableTokens}
-          />
-          <div className="relative">
-            <Input
-              type="text"
-              placeholder="0.0"
-              value={fromAmount}
-              onChange={(e) => setFromAmount(e.target.value)}
-              disabled={!fromToken}
-              rightElement={<span className="text-sm text-muted-foreground">{fromToken?.symbol}</span>}
-            />
-            {fromUsdValue !== null && (
-              <div className="absolute right-16 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                ${fromUsdValue.toFixed(2)}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Swap Direction Button */}
-        <div className="flex justify-center">
+        <h2 className="text-xl font-black uppercase tracking-tight text-stone-900">
+          Swap
+        </h2>
+        <div className="flex items-center gap-2">
+          {/* Encryption Toggle */}
           <button
             type="button"
-            onClick={handleSwapTokens}
-            disabled={!fromToken || !toToken}
+            onClick={() => setUseEncryption(!useEncryption)}
             className={cn(
-              'rounded-full border border-border bg-card p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50'
+              "flex items-center gap-1.5 rounded-lg border-2 border-solid px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all hover:translate-y-0.5 active:translate-y-[3px]",
+              useEncryption
+                ? "bg-primary text-primary-foreground border-primary brutalist-shadow-sm hover:shadow-[1px_1px_0_0_#000]"
+                : "bg-stone-100 text-stone-900 border-black hover:bg-stone-200 brutalist-shadow-sm hover:shadow-[1px_1px_0_0_#000]"
             )}
+            title={useEncryption ? "BITE Encrypted (on)" : "Not Encrypted (off)"}
           >
-            <ArrowDownUp className="h-5 w-5" />
+            {useEncryption ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
           </button>
-        </div>
-
-        {/* To Token */}
-        <div className="space-y-2">
-          <span className="text-sm font-medium text-muted-foreground">To</span>
-          <TokenSelector
-            selectedToken={toToken}
-            onSelect={setToToken}
-            label="Select token"
-            availableTokens={availableTokens}
-          />
-          <div className="relative">
-            <Input
-              type="text"
-              placeholder="0.0"
-              value={toAmount}
-              onChange={(e) => setToAmount(e.target.value)}
-              disabled={!toToken}
-              rightElement={<span className="text-sm text-muted-foreground">{toToken?.symbol}</span>}
-            />
-            {toUsdValue !== null && (
-              <div className="absolute right-16 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                ${toUsdValue.toFixed(2)}
-              </div>
-            )}
-          </div>
+          {/* Slippage Settings */}
+          <button
+            type="button"
+            onClick={() => setShowSlippageSettings(!showSlippageSettings)}
+            className="flex items-center gap-1.5 rounded-lg border-2 border-solid border-black bg-stone-100 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-stone-900 brutalist-shadow-sm transition-all hover:bg-stone-200 hover:translate-y-0.5 hover:shadow-[1px_1px_0_0_#000] active:shadow-none active:translate-y-[3px] active:translate-x-[3px]"
+          >
+            <Settings className="h-3.5 w-3.5" />
+            {slippage}%
+          </button>
         </div>
       </div>
 
-      {/* Price Display */}
-      {calculatedOutput && fromToken && toToken && (
-        <div className="rounded-lg bg-muted p-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Rate</span>
-            <span className="font-medium text-foreground">
-              1 {fromToken.symbol} ={' '}
-              {formatBigInt(
-                (calculatedOutput * BigInt(10 ** (fromToken.decimals ?? 18))) /
-                  parseBigInt(fromAmount, fromToken.decimals ?? 18),
-                toToken.decimals ?? 18
-              )}{' '}
-              {toToken.symbol}
+      {/* Slippage Settings */}
+      {showSlippageSettings && (
+        <div className="bg-stone-100 border-2 border-solid border-black rounded-xl p-4 space-y-3 brutalist-shadow-sm">
+          {/* Encryption Mode */}
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-stone-600 mb-2">
+              Encryption Mode
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setUseEncryption(true)}
+                className={cn(
+                  "rounded-lg border-2 border-solid py-2 px-3 text-xs font-extrabold uppercase tracking-wide transition-all flex items-center justify-center gap-1.5",
+                  useEncryption
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-white text-stone-900 border-black hover:bg-stone-200"
+                )}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                Encrypted
+              </button>
+              <button
+                type="button"
+                onClick={() => setUseEncryption(false)}
+                className={cn(
+                  "rounded-lg border-2 border-solid py-2 px-3 text-xs font-extrabold uppercase tracking-wide transition-all flex items-center justify-center gap-1.5",
+                  !useEncryption
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-white text-stone-900 border-black hover:bg-stone-200"
+                )}
+              >
+                <EyeOff className="h-3.5 w-3.5" />
+                Standard
+              </button>
+            </div>
+            <p className="text-[9px] text-stone-500 font-medium">
+              {useEncryption ? "BITE threshold encryption enabled" : "Standard DEX swap (no encryption)"}
+            </p>
+          </div>
+
+          {/* Slippage Tolerance */}
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-stone-600 mb-2">
+              Slippage Tolerance
+            </p>
+            <div className="flex gap-2">
+              {[0.1, 0.5, 1].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    setSlippage(preset.toString());
+                    setShowSlippageSettings(false);
+                  }}
+                  className={cn(
+                    "flex-1 rounded-lg border-2 border-solid py-2 text-xs font-extrabold uppercase tracking-wide transition-all",
+                    slippage === preset.toString()
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-white text-stone-900 border-black hover:bg-stone-200 brutalist-shadow-sm"
+                  )}
+                >
+                  {preset}%
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* No Route Warning */}
+      {hasNoRoute && (
+        <div className="bg-warning/10 border-2 border-solid border-warning rounded-xl p-3 text-xs brutalist-shadow-sm">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-warning shrink-0" />
+            <span className="font-extrabold uppercase tracking-wide text-stone-900">
+              No {fromToken.symbol}/{toToken.symbol} pool
             </span>
           </div>
         </div>
       )}
 
+      {/* Swap Interface */}
+      <div className="space-y-3">
+        {/* From Token */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-500">
+              From
+            </span>
+            <div className="flex items-center gap-2">
+              {fromUsdPrice && (
+                <span className="text-[10px] font-bold text-stone-500">
+                  ${safeFixed(fromUsdPrice, 4)}
+                </span>
+              )}
+              {fromBalance && (
+                <button
+                  type="button"
+                  onClick={handleMax}
+                  className="text-[10px] font-bold uppercase tracking-wide text-primary hover:underline"
+                >
+                  Max: {formatBigInt(fromBalance.value, fromBalance.decimals)}
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="bg-stone-50 border-2 border-solid border-black rounded-xl p-3 space-y-3 brutalist-shadow-sm">
+            <TokenSelector
+              selectedToken={fromToken}
+              onSelect={(token) => {
+                setFromToken(token);
+                setCachedAmounts({ fromAmount: '', toAmount: '' });
+                setEditingField(null);
+              }}
+              label="Select"
+              availableTokens={availableTokens}
+            />
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="0.0"
+                value={cachedAmounts.fromAmount}
+                onChange={(e) => {
+                  setCachedAmounts({ fromAmount: e.target.value });
+                  setEditingField('from');
+                }}
+                disabled={!fromToken}
+                className="!h-11 !text-lg !font-extrabold bg-white"
+                rightElement={<span className="text-xs font-bold text-stone-500">{fromToken?.symbol}</span>}
+              />
+              {fromUsdValue !== null && (
+                <div className="absolute right-16 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-500 flex items-center gap-1">
+                  <DollarSign className="h-3 w-3" />
+                  {safeFixed(fromUsdValue, 2)}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Swap Direction Button */}
+        <div className="flex justify-center -my-2 relative z-10">
+          <button
+            type="button"
+            onClick={handleSwapTokens}
+            disabled={!fromToken || !toToken}
+            className={cn(
+              'rounded-full bg-primary border-2 border-solid border-black p-2.5 text-primary-foreground transition-all hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 brutalist-shadow-sm'
+            )}
+          >
+            <ArrowDownUp className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* To Token */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-500">
+              To
+            </span>
+            {toUsdPrice && (
+              <span className="text-[10px] font-bold text-stone-500">
+                ${safeFixed(toUsdPrice, 4)}
+              </span>
+            )}
+          </div>
+          <div className="bg-stone-50 border-2 border-solid border-black rounded-xl p-3 space-y-3 brutalist-shadow-sm">
+            <TokenSelector
+              selectedToken={toToken}
+              onSelect={(token) => {
+                setToToken(token);
+                // Keep from amount, recalculate to amount
+                if (cachedAmounts.fromAmount) {
+                  setEditingField('from');
+                } else {
+                  setCachedAmounts({ toAmount: '' });
+                  setEditingField(null);
+                }
+              }}
+              label="Select"
+              availableTokens={availableTokens}
+            />
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="0.0"
+                value={cachedAmounts.toAmount}
+                onChange={(e) => {
+                  setCachedAmounts({ toAmount: e.target.value });
+                  setEditingField('to');
+                }}
+                disabled={!toToken}
+                className="!h-11 !text-lg !font-extrabold bg-white"
+                rightElement={<span className="text-xs font-bold text-stone-500">{toToken?.symbol}</span>}
+              />
+              {toUsdValue !== null && (
+                <div className="absolute right-16 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-500 flex items-center gap-1">
+                  <DollarSign className="h-3 w-3" />
+                  {safeFixed(toUsdValue, 2)}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Price Display & Trade Value */}
+      {(calculatedOutput || (fromUsdValue && toUsdValue)) && (
+        <div className="bg-stone-100 border-2 border-solid border-black rounded-xl p-4 brutalist-shadow-sm space-y-3">
+          {/* Exchange Rate */}
+          {calculatedOutput && fromToken && toToken && cachedAmounts.fromAmount && (
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-500">
+                Rate
+              </span>
+              <span className="text-xs font-bold text-stone-900">
+                1 {fromToken.symbol} = {' '}
+                {formatBigInt(
+                  (calculatedOutput * BigInt(10 ** (fromToken.decimals ?? 18))) /
+                    parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18),
+                  toToken.decimals ?? 18
+                )}{' '}
+                {toToken.symbol}
+              </span>
+            </div>
+          )}
+
+          {/* Live Prices */}
+          <div className="grid grid-cols-2 gap-2">
+            {fromUsdPrice && (
+              <div className="bg-white border-2 border-stone-300 rounded-lg p-2 text-center">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-stone-500">{fromToken?.symbol}</p>
+                <p className="text-sm font-black text-stone-900">${safeFixed(fromUsdPrice, 4)}</p>
+              </div>
+            )}
+            {toUsdPrice && (
+              <div className="bg-white border-2 border-stone-300 rounded-lg p-2 text-center">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-stone-500">{toToken?.symbol}</p>
+                <p className="text-sm font-black text-stone-900">${safeFixed(toUsdPrice, 4)}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Trade USD Value */}
+          {fromUsdValue !== null && toUsdValue !== null && (
+            <div className="bg-primary/10 border-2 border-primary rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-600">
+                  Trade Value
+                </span>
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-black text-primary">
+                    {safeFixed(fromUsdValue, 2)} → {safeFixed(toUsdValue, 2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Error Display */}
       {error && (
-        <div className="flex items-center gap-2 rounded-lg bg-error/10 p-3 text-error">
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <span className="text-sm">{error}</span>
+        <div className="bg-error/10 border-2 border-solid border-error rounded-xl p-3 brutalist-shadow-sm">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-error shrink-0" />
+            <span className="text-xs font-extrabold uppercase tracking-wide text-stone-900">
+              {error}
+            </span>
+          </div>
         </div>
       )}
 
       {/* Action Button */}
       {actionButton()}
 
-      {/* Info */}
+      {/* Approval Info */}
       {needsApproval && allowance !== undefined && allowance > BigInt(0) && (
-        <p className="text-center text-xs text-muted-foreground">
-          Additional approval required. Current allowance:{' '}
-          {formatBigInt(allowance, fromToken?.decimals ?? 18)}
-        </p>
+        <div className="bg-accent/10 border-2 border-solid border-accent rounded-xl px-3 py-2 text-center">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-stone-700">
+            Approve {formatBigInt(allowance, fromToken?.decimals ?? 18)} {fromToken?.symbol} more
+          </p>
+        </div>
       )}
     </div>
   );

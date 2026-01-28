@@ -23,7 +23,7 @@ class OrdersDatabase extends Dexie {
   orders!: Table<LocalOrder>;
 
   constructor() {
-    super('BiteAMMOrders');
+    super('BiteSwapOrders');
     this.version(1).stores({
       orders: '++id, orderId, pool, userAddress, chainId, status, createdAt',
     });

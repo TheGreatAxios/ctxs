@@ -1,16 +1,16 @@
 pragma solidity 0.8.24;
 
 import "forge-std/Test.sol";
-import "../../src/amm/SushiSwapV2Factory.sol";
-import "../../src/amm/SushiSwapV2Pair.sol";
+import "../../src/amm/BiteSwapV2Factory.sol";
+import "../../src/amm/BiteSwapV2Pair.sol";
 import "../../src/limitorder/ConfidentialLimitOrderBook.sol";
 import "../../src/limitorder/LimitOrderStructs.sol";
 import "../../src/MockToken.sol";
 
 contract LimitOrderTest is Test {
-    SushiSwapV2Factory factory;
+    BiteSwapV2Factory factory;
     ConfidentialLimitOrderBook lob;
-    SushiSwapV2Pair pair;
+    BiteSwapV2Pair pair;
     MockToken tokenA;
     MockToken tokenB;
 
@@ -30,7 +30,7 @@ contract LimitOrderTest is Test {
 
         // Deploy factory
         vm.prank(alice);
-        factory = new SushiSwapV2Factory();
+        factory = new BiteSwapV2Factory();
 
         // Deploy LOB
         vm.prank(alice);
@@ -45,28 +45,28 @@ contract LimitOrderTest is Test {
         // Create pair
         vm.prank(alice);
         address pairAddr = factory.createPair(address(tokenA), address(tokenB));
-        pair = SushiSwapV2Pair(pairAddr);
+        pair = BiteSwapV2Pair(pairAddr);
 
         // Mint tokens to bob
         vm.prank(alice);
-        tokenA.mint(bob, 100_000 * 10**18);
+        tokenA.mint(bob, 100_000 * 10 ** 18);
         vm.prank(alice);
-        tokenB.mint(bob, 100_000 * 10**18);
+        tokenB.mint(bob, 100_000 * 10 ** 18);
 
         // Add liquidity
         vm.startPrank(bob);
         tokenA.approve(address(pair), type(uint256).max);
         tokenB.approve(address(pair), type(uint256).max);
-        tokenA.transfer(address(pair), 10_000 * 10**18);
-        tokenB.transfer(address(pair), 10_000 * 10**18);
+        tokenA.transfer(address(pair), 10_000 * 10 ** 18);
+        tokenB.transfer(address(pair), 10_000 * 10 ** 18);
         pair.mint(bob);
         vm.stopPrank();
     }
 
     function testSubmitLimitOrder() public {
         // Mock encrypted data (would use bite-ts in production)
-        bytes memory encryptedPrice = abi.encode(100 * 10**18);
-        bytes memory encryptedAmount = abi.encode(10 * 10**18);
+        bytes memory encryptedPrice = abi.encode(100 * 10 ** 18);
+        bytes memory encryptedAmount = abi.encode(10 * 10 ** 18);
 
         vm.startPrank(bob);
         lob.submitLimitOrder{value: 0.01 ether}(
@@ -83,32 +83,20 @@ contract LimitOrderTest is Test {
     }
 
     function testSubmitLimitOrderInsufficientGas() public {
-        bytes memory encryptedPrice = abi.encode(100 * 10**18);
-        bytes memory encryptedAmount = abi.encode(10 * 10**18);
+        bytes memory encryptedPrice = abi.encode(100 * 10 ** 18);
+        bytes memory encryptedAmount = abi.encode(10 * 10 ** 18);
 
         vm.prank(bob);
         vm.expectRevert(ConfidentialLimitOrderBook.InsufficientGasPayment.selector);
-        lob.submitLimitOrder{value: 0.001 ether}(
-            address(pair),
-            encryptedPrice,
-            encryptedAmount,
-            true,
-            0
-        );
+        lob.submitLimitOrder{value: 0.001 ether}(address(pair), encryptedPrice, encryptedAmount, true, 0);
     }
 
     function testCancelOrder() public {
-        bytes memory encryptedPrice = abi.encode(100 * 10**18);
-        bytes memory encryptedAmount = abi.encode(10 * 10**18);
+        bytes memory encryptedPrice = abi.encode(100 * 10 ** 18);
+        bytes memory encryptedAmount = abi.encode(10 * 10 ** 18);
 
         vm.startPrank(bob);
-        lob.submitLimitOrder{value: 0.01 ether}(
-            address(pair),
-            encryptedPrice,
-            encryptedAmount,
-            true,
-            0
-        );
+        lob.submitLimitOrder{value: 0.01 ether}(address(pair), encryptedPrice, encryptedAmount, true, 0);
 
         lob.cancelOrder(address(pair), 0);
         vm.stopPrank();
@@ -118,17 +106,11 @@ contract LimitOrderTest is Test {
     }
 
     function testCancelNotYourOrder() public {
-        bytes memory encryptedPrice = abi.encode(100 * 10**18);
-        bytes memory encryptedAmount = abi.encode(10 * 10**18);
+        bytes memory encryptedPrice = abi.encode(100 * 10 ** 18);
+        bytes memory encryptedAmount = abi.encode(10 * 10 ** 18);
 
         vm.prank(bob);
-        lob.submitLimitOrder{value: 0.01 ether}(
-            address(pair),
-            encryptedPrice,
-            encryptedAmount,
-            true,
-            0
-        );
+        lob.submitLimitOrder{value: 0.01 ether}(address(pair), encryptedPrice, encryptedAmount, true, 0);
 
         vm.prank(alice);
         vm.expectRevert(ConfidentialLimitOrderBook.NotYourOrder.selector);
@@ -168,11 +150,11 @@ contract LimitOrderTest is Test {
     }
 
     // Helper function to check order active status
-    function _getOrderActive(
-        ConfidentialLimitOrderBook _lob,
-        address pool,
-        uint256 orderId
-    ) internal view returns (address, bool) {
+    function _getOrderActive(ConfidentialLimitOrderBook _lob, address pool, uint256 orderId)
+        internal
+        view
+        returns (address, bool)
+    {
         LimitOrderStructs.LimitOrder memory order = _lob.getOrder(pool, orderId);
         return (order.maker, order.active);
     }

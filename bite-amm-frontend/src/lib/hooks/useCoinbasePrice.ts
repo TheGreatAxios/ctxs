@@ -1,16 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
+import { TOKENS } from "@/config/tokens";
+import type { Address } from "viem";
 
 // Coinbase API base URL
-const COINBASE_API = 'https://api.coinbase.com/v2';
+const COINBASE_API = "https://api.coinbase.com/v2";
 
 // Token symbol to Coinbase ID mapping
 const SYMBOL_TO_COINBASE_ID: Record<string, string> = {
-  SKL: 'skale',
-  USDC: 'usd-coin',
-  USDT: 'tether',
-  WBTC: 'wrapped-bitcoin',
-  WETH: 'weth',
-  ETH: 'ethereum',
+  SKL: "skale",
+  USDC: "usd-coin",
+  USDT: "tether",
+  WBTC: "wrapped-bitcoin",
+  WETH: "weth",
+  ETH: "ethereum",
 };
 
 // Cache time: 30 seconds, stale time: 15 seconds
@@ -18,9 +20,8 @@ const CACHE_TIME = 30_000;
 const STALE_TIME = 15_000;
 
 interface PriceData {
-  base: string;
   currency: string;
-  amount: string;
+  rates: Record<string, string>;
 }
 
 interface CoinbaseResponse {
@@ -29,38 +30,41 @@ interface CoinbaseResponse {
 
 /**
  * Fetches the current USD price of a token from Coinbase
- * @param symbol - Token symbol (e.g., 'ETH', 'USDC')
+ * @param coinbaseId - Coinbase currency ID (e.g., 'ethereum', 'usd-coin')
  * @returns Price in USD or null if not found
  */
-async function fetchCoinbasePrice(symbol: string): Promise<number | null> {
-  const coinbaseId = SYMBOL_TO_COINBASE_ID[symbol.toUpperCase()];
-  if (!coinbaseId) return null;
-
+async function fetchCoinbasePriceById(
+  coinbaseId: string,
+): Promise<number | null> {
   try {
     const response = await fetch(
-      `${COINBASE_API}/exchange-rates?currency=${coinbaseId}`
+      `${COINBASE_API}/exchange-rates?currency=${coinbaseId}`,
     );
 
     if (!response.ok) return null;
 
     const data: CoinbaseResponse = await response.json();
-    // Coinbase returns rates as strings, get USD rate
-    const usdRate = data.data.amount;
-    return parseFloat(usdRate);
+    // Coinbase returns rates as { "USD": "3456.78", ... }
+    const usdRate = data.data.rates?.USD;
+
+    if (!usdRate) return null;
+
+    const price = parseFloat(usdRate);
+    return isNaN(price) ? null : price;
   } catch {
     return null;
   }
 }
 
 /**
- * Hook to fetch token price from Coinbase
- * @param symbol - Token symbol (e.g., 'ETH', 'USDC')
+ * Hook to fetch token price from Coinbase by coinbase ID
+ * @param coinbaseId - Coinbase currency ID (e.g., 'ethereum', 'usd-coin')
  */
-export function useCoinbasePrice(symbol?: string) {
+export function useCoinbasePriceById(coinbaseId?: string | null) {
   return useQuery({
-    queryKey: ['coinbase-price', symbol],
-    queryFn: () => fetchCoinbasePrice(symbol ?? ''),
-    enabled: !!symbol,
+    queryKey: ["coinbase-price", coinbaseId],
+    queryFn: () => fetchCoinbasePriceById(coinbaseId ?? ""),
+    enabled: !!coinbaseId,
     staleTime: STALE_TIME,
     gcTime: CACHE_TIME,
     retry: 2,
@@ -68,32 +72,37 @@ export function useCoinbasePrice(symbol?: string) {
 }
 
 /**
- * Hook to fetch multiple token prices from Coinbase
- * @param symbols - Array of token symbols
+ * Hook to fetch token price by token address
+ * Looks up the token in TOKENS config to get the coinbase ID
+ * @param tokenAddress - Token contract address
  */
-export function useCoinbasePrices(symbols: string[]) {
-  const queries = symbols.map((symbol) => ({
-    queryKey: ['coinbase-price', symbol],
-    queryFn: () => fetchCoinbasePrice(symbol),
-    staleTime: STALE_TIME,
-    gcTime: CACHE_TIME,
-  }));
+export function useTokenPrice(tokenAddress?: Address | null) {
+  // Find token by address (case-insensitive)
+  const token = Object.values(TOKENS).find(
+    (t) => t.address.toLowerCase() === (tokenAddress ?? "").toLowerCase(),
+  );
 
-  const results = useQuery({
-    queryKey: ['coinbase-prices', symbols],
-    queryFn: async () => {
-      const prices = await Promise.all(
-        symbols.map((symbol) => fetchCoinbasePrice(symbol))
-      );
-      return prices.reduce((acc, price, i) => {
-        acc[symbols[i]] = price;
-        return acc;
-      }, {} as Record<string, number | null>);
-    },
-    enabled: symbols.length > 0,
-    staleTime: STALE_TIME,
-    gcTime: CACHE_TIME,
-  });
+  const coinbaseId = token?.coinbaseId;
+  return useCoinbasePriceById(coinbaseId ?? null);
+}
 
-  return results;
+/**
+ * Legacy hook for symbol-based lookup (kept for backward compatibility)
+ * @deprecated Use useTokenPrice or useCoinbasePriceById instead
+ * @param symbol - Token symbol (e.g., 'ETH', 'USDC')
+ */
+export function useCoinbasePrice(symbol?: string) {
+  const coinbaseId = symbol
+    ? SYMBOL_TO_COINBASE_ID[symbol.toUpperCase()]
+    : undefined;
+  return useCoinbasePriceById(coinbaseId ?? null);
+}
+
+/**
+ * Hook to fetch multiple token prices by addresses
+ * @param tokenAddresses - Array of token contract addresses
+ */
+export function useTokenPrices(tokenAddresses: Address[]) {
+  const prices = tokenAddresses.map((addr) => useTokenPrice(addr));
+  return prices;
 }

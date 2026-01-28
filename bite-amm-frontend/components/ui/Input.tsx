@@ -16,7 +16,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="mb-1.5 block text-sm font-medium text-muted-foreground"
+            className="mb-2 block text-sm font-extrabold uppercase tracking-wide text-foreground"
           >
             {label}
           </label>
@@ -26,21 +26,43 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={cn(
-              'flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-              error && 'border-error focus-visible:ring-error',
-              rightElement && 'pr-10',
+              // Base styles
+              'flex h-11 w-full px-4 text-base font-medium text-foreground',
+              // Neo-brutalist border and shadow
+              'border-3 border-solid border-border bg-background',
+              'rounded-md transition-all',
+              // Focus styles
+              'focus:outline-none focus:border-primary',
+              // Placeholder
+              'placeholder:text-muted-foreground/70',
+              // Disabled
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              // Error state
+              error && 'border-error focus:border-error',
+              // Right element padding
+              rightElement && 'pr-12',
+              // Custom shadow for brutalist effect
+              'shadow-brutalist',
               className
             )}
+            style={{
+              boxShadow: error
+                ? '4px 4px 0px 0px hsl(var(--error))'
+                : '4px 4px 0px 0px hsl(var(--border))',
+            }}
             {...props}
           />
           {rightElement && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">
               {rightElement}
             </div>
           )}
         </div>
         {error && (
-          <p className="mt-1 text-xs text-error">{error}</p>
+          <div className="mt-2 flex items-center gap-2">
+            <div className="h-1 w-1 rounded-full bg-error" />
+            <p className="text-xs font-bold uppercase tracking-wide text-error">{error}</p>
+          </div>
         )}
       </div>
     );

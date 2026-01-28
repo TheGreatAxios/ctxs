@@ -55,74 +55,74 @@ export function OrderList() {
 
   if (!address) {
     return (
-      <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-6">
-        <p className="text-center text-gray-400">Connect wallet to view orders</p>
+      <div className="bg-white border-3 border-black brutalist-shadow-lg rounded-2xl p-6 h-full flex items-center justify-center">
+        <p className="text-center font-semibold text-stone-500">Connect wallet to view orders</p>
       </div>
     );
   }
 
   if (orders.length === 0) {
     return (
-      <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-6">
-        <p className="text-center text-gray-400">No orders found</p>
+      <div className="bg-white border-3 border-black brutalist-shadow-lg rounded-2xl p-6 h-full flex items-center justify-center">
+        <p className="text-center font-semibold text-stone-500">No orders found</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
-      <div className="p-6 border-b border-gray-700">
-        <h2 className="text-xl font-semibold text-white">Your Orders</h2>
+    <div className="bg-white border-3 border-black brutalist-shadow-lg rounded-2xl overflow-hidden flex flex-col h-full">
+      <div className="p-4 border-b-3 border-black bg-stone-100 flex-shrink-0">
+        <h2 className="text-lg font-black text-stone-900 uppercase tracking-widest">Your Orders</h2>
       </div>
 
-      <div className="divide-y divide-gray-700">
+      <div className="overflow-y-auto flex-1 divide-y-2 divide-stone-200">
         {orders.map((order) => (
           <div
             key={order.id ?? order.orderId.toString()}
-            className="p-6 hover:bg-gray-700/30 transition-colors"
+            className="p-4 hover:bg-stone-50 transition-colors"
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 {/* Pool Name & Direction */}
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-white font-medium">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-black text-sm text-stone-900 uppercase tracking-wider">
                     {getPoolName(order.pool)}
                   </span>
                   <Badge
                     variant={order.direction ? 'open' : 'cancelled'}
-                    className="text-xs"
+                    className="text-[10px]"
                   >
                     {order.direction ? 'BUY' : 'SELL'}
                   </Badge>
-                  <Badge variant={getStatusVariant(order.status)} className="text-xs">
+                  <Badge variant={getStatusVariant(order.status)} className="text-[10px]">
                     {order.status.toUpperCase()}
                   </Badge>
                 </div>
 
                 {/* Price & Amount */}
-                <div className="grid grid-cols-2 gap-4 mb-3">
-                  <div>
-                    <p className="text-xs text-gray-400 mb-1">Target Price</p>
-                    <p className="text-white font-medium">{order.targetPrice}</p>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div className="bg-stone-50 border-2 border-stone-200 rounded-lg p-2">
+                    <p className="text-[10px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Target</p>
+                    <p className="font-black text-sm text-stone-900">{order.targetPrice}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-400 mb-1">Amount</p>
-                    <p className="text-white font-medium">{order.amount}</p>
+                  <div className="bg-stone-50 border-2 border-stone-200 rounded-lg p-2">
+                    <p className="text-[10px] font-bold text-stone-500 mb-0.5 uppercase tracking-wider">Amount</p>
+                    <p className="font-black text-sm text-stone-900">{order.amount}</p>
                   </div>
                 </div>
 
                 {/* Order ID & TX Link */}
-                <div className="flex items-center gap-4 text-xs text-gray-400">
-                  <span>ID: #{order.orderId.toString()}</span>
+                <div className="flex items-center gap-2 text-[10px] font-semibold text-stone-500">
+                  <span className="font-mono">#{order.orderId.toString()}</span>
                   {order.txHash && (
                     <a
                       href={`${skaleCtxChain.blockExplorers.default.url}/tx/${order.txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 hover:text-blue-400 transition-colors"
+                      className="flex items-center gap-1 hover:text-primary transition-colors font-bold"
                     >
-                      View TX
-                      <ExternalLink className="w-3 h-3" />
+                      TX
+                      <ExternalLink className="w-2.5 h-2.5" />
                     </a>
                   )}
                 </div>
@@ -133,13 +133,13 @@ export function OrderList() {
                 <button
                   onClick={() => handleCancel(order.pool, order.orderId)}
                   disabled={isPending || isConfirming}
-                  className="flex-shrink-0 bg-red-900/30 hover:bg-red-900/50 disabled:bg-gray-800 disabled:cursor-not-allowed text-red-300 border border-red-900/50 rounded-lg p-2 transition-colors"
+                  className="flex-shrink-0 bg-error/10 hover:bg-error/20 disabled:bg-stone-100 disabled:cursor-not-allowed text-error border-2 border-error rounded-lg p-2 transition-all brutalist-shadow-sm hover:shadow-[2px_2px_0_0_#000] active:shadow-none active:translate-y-[2px] active:translate-x-[2px]"
                   title="Cancel order"
                 >
                   {isPending || isConfirming ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4" />
                   )}
                 </button>
               )}

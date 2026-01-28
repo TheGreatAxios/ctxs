@@ -1,6 +1,6 @@
 pragma solidity 0.8.24;
 
-interface ISushiSwapV2Factory {
+interface IBiteSwapV2Factory {
     /// @notice Get the pair address for two tokens
     /// @param tokenA First token address
     /// @param tokenB Second token address

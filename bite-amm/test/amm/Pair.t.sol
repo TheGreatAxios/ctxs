@@ -1,13 +1,13 @@
 pragma solidity 0.8.24;
 
 import "forge-std/Test.sol";
-import "../../src/amm/SushiSwapV2Pair.sol";
-import "../../src/amm/SushiSwapV2Factory.sol";
+import "../../src/amm/BiteSwapV2Pair.sol";
+import "../../src/amm/BiteSwapV2Factory.sol";
 import "../../src/MockToken.sol";
 
 contract PairTest is Test {
-    SushiSwapV2Factory factory;
-    SushiSwapV2Pair pair;
+    BiteSwapV2Factory factory;
+    BiteSwapV2Pair pair;
     MockToken tokenA;
     MockToken tokenB;
 
@@ -32,18 +32,18 @@ contract PairTest is Test {
 
         // Deploy factory
         vm.prank(alice);
-        factory = new SushiSwapV2Factory();
+        factory = new BiteSwapV2Factory();
 
         // Create pair
         vm.prank(alice);
         address pairAddr = factory.createPair(address(tokenA), address(tokenB));
-        pair = SushiSwapV2Pair(pairAddr);
+        pair = BiteSwapV2Pair(pairAddr);
 
         // Mint tokens to bob
         vm.prank(alice);
-        tokenA.mint(bob, 100_000 * 10**18);
+        tokenA.mint(bob, 100_000 * 10 ** 18);
         vm.prank(alice);
-        tokenB.mint(bob, 100_000 * 10**18);
+        tokenB.mint(bob, 100_000 * 10 ** 18);
     }
 
     function testInitialState() public view {
@@ -53,8 +53,8 @@ contract PairTest is Test {
     }
 
     function testAddLiquidity() public {
-        uint256 amountA = 1000 * 10**18;
-        uint256 amountB = 1000 * 10**18;
+        uint256 amountA = 1000 * 10 ** 18;
+        uint256 amountB = 1000 * 10 ** 18;
 
         vm.startPrank(bob);
         tokenA.approve(address(pair), amountA);
@@ -72,8 +72,8 @@ contract PairTest is Test {
 
     function testSwap() public {
         // Add liquidity first
-        uint256 amountA = 10_000 * 10**18;
-        uint256 amountB = 10_000 * 10**18;
+        uint256 amountA = 10_000 * 10 ** 18;
+        uint256 amountB = 10_000 * 10 ** 18;
 
         vm.startPrank(bob);
         tokenA.approve(address(pair), type(uint256).max);
@@ -84,8 +84,8 @@ contract PairTest is Test {
         pair.mint(bob);
 
         // Calculate expected output
-        (uint112 reserve0, uint112 reserve1, ) = pair.getReserves();
-        uint256 amountIn = 100 * 10**18;
+        (uint112 reserve0, uint112 reserve1,) = pair.getReserves();
+        uint256 amountIn = 100 * 10 ** 18;
         uint256 amountOut = pair.getAmountOut(amountIn, uint256(reserve0), uint256(reserve1));
 
         // Perform swap
@@ -108,16 +108,16 @@ contract PairTest is Test {
         tokenA.approve(address(pair), type(uint256).max);
 
         vm.expectRevert();
-        pair.swap(100 * 10**18, 0, bob, "");
+        pair.swap(100 * 10 ** 18, 0, bob, "");
         vm.stopPrank();
     }
 
     function testGetAmountOut() public view {
-        uint256 amountIn = 1000 * 10**18;
-        uint256 reserveIn = 100_000 * 10**18;
-        uint256 reserveOut = 100_000 * 10**18;
+        uint256 amountIn = 1000 * 10 ** 18;
+        uint256 reserveIn = 100_000 * 10 ** 18;
+        uint256 reserveOut = 100_000 * 10 ** 18;
 
-        uint256 amountOut = SushiSwapV2Pair(address(pair)).getAmountOut(amountIn, reserveIn, reserveOut);
+        uint256 amountOut = BiteSwapV2Pair(address(pair)).getAmountOut(amountIn, reserveIn, reserveOut);
 
         // Output should be less than input due to fees
         assertLt(amountOut, amountIn);
@@ -126,8 +126,8 @@ contract PairTest is Test {
 
     function testRemoveLiquidity() public {
         // Add liquidity first
-        uint256 amountA = 1000 * 10**18;
-        uint256 amountB = 1000 * 10**18;
+        uint256 amountA = 1000 * 10 ** 18;
+        uint256 amountB = 1000 * 10 ** 18;
 
         vm.startPrank(bob);
         tokenA.approve(address(pair), type(uint256).max);

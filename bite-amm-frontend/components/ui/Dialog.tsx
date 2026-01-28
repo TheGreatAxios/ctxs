@@ -42,7 +42,7 @@ export function Dialog({ isOpen, onClose, title, children, className }: DialogPr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-background/80 backdrop-blur-sm"
@@ -54,26 +54,28 @@ export function Dialog({ isOpen, onClose, title, children, className }: DialogPr
       <div
         ref={dialogRef}
         className={cn(
-          'relative z-50 w-full max-w-md rounded-xl border border-border bg-card shadow-xl',
+          'relative z-50 w-full max-w-md bg-white border-3 border-black rounded-xl brutalist-shadow',
           className
         )}
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between border-b border-border px-6 py-4">
-            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+          <div className="flex items-center justify-between border-b-3 border-black px-6 py-4 bg-stone-100 rounded-t-xl">
+            <h2 className="text-lg font-extrabold uppercase tracking-wide text-stone-900">
+              {title}
+            </h2>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-lg border-2 border-black bg-white p-1.5 text-stone-900 transition-all hover:bg-error hover:border-error hover:text-white brutalist-shadow-sm"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         )}
 
         {/* Content */}
-        <div className="max-h-[70vh] overflow-y-auto">
+        <div className="max-h-[70vh] overflow-y-auto p-6">
           {children}
         </div>
       </div>

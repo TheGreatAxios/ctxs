@@ -1,41 +1,31 @@
-import type { TokenInfo } from '@/components/dex/TokenSelector';
+import type { TokenInfo } from "@/components/dex/TokenSelector";
 
+// SKALE Testnet deployed addresses
+// Note: ETH removed - SKALE uses sFUEL/credits for gas with zero fees
 export const TOKENS: Record<string, TokenInfo> = {
-  SKL: {
-    address: (process.env.NEXT_PUBLIC_SKL_ADDRESS ?? '0xaf2000000000000000000000000000000000057b') as `0x${string}`,
-    symbol: 'SKL',
-    decimals: 18,
-    coinbaseId: 'skale',
-  },
   USDC: {
-    address: (process.env.NEXT_PUBLIC_USDC_ADDRESS ?? '0x2e0000000000000000000000000000000000000bD') as `0x${string}`,
-    symbol: 'USDC.e',
+    address: "0xC8EEde488d7152CED970D9e9621D9330b64Cfd24" as `0x${string}`,
+    symbol: "USDC",
     decimals: 6,
-    coinbaseId: 'usd-coin',
+    coinbaseId: "usd-coin",
   },
   USDT: {
-    address: (process.env.NEXT_PUBLIC_USDT_ADDRESS ?? '0x3ca000000000000000000000000000000000000bf') as `0x${string}`,
-    symbol: 'USDT',
+    address: "0x7433ddb971f6a29e24bac69E2d86396201a7aa78" as `0x${string}`,
+    symbol: "USDT",
     decimals: 6,
-    coinbaseId: 'tether',
+    coinbaseId: "tether",
   },
   WBTC: {
-    address: (process.env.NEXT_PUBLIC_WBTC_ADDRESS ?? '0x45100000000000000000000000000000000000e87') as `0x${string}`,
-    symbol: 'WBTC',
+    address: "0x09C6e0Fe49080e10DF7db8A0c8d64660C4d55D86" as `0x${string}`,
+    symbol: "WBTC",
     decimals: 8,
-    coinbaseId: 'wrapped-bitcoin',
+    coinbaseId: "wrapped-bitcoin",
   },
   WETH: {
-    address: (process.env.NEXT_PUBLIC_WETH_ADDRESS ?? '0xf9400000000000000000000000000000000000fc0') as `0x${string}`,
-    symbol: 'WETH',
-    decimals: 6,
-    coinbaseId: 'weth',
-  },
-  ETH: {
-    address: '0x0000000000000000000000000000000000000000' as `0x${string}`,
-    symbol: 'ETH',
+    address: "0x4B0D38a8bC57e78Eb0Afa5eeA1A1DA30072134ab" as `0x${string}`,
+    symbol: "WETH",
     decimals: 18,
-    coinbaseId: 'ethereum',
+    coinbaseId: "ethereum",
   },
 };
 
