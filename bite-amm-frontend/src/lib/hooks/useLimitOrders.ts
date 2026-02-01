@@ -1,7 +1,12 @@
-import { useSimulateContract, useWriteContract } from "wagmi";
+import {
+  useSimulateContract,
+  useWriteContract,
+  useReadContract,
+  useReadContracts,
+} from "wagmi";
 import type { Address } from "viem";
 import { toBytes, toHex } from "viem";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { encryptTE } from "../bite/encryption";
 import { useTxReceipt } from "./useTxReceipt";
 import ConfidentialLimitOrderBookABI from "../../../abi/ConfidentialLimitOrderBook.json";
@@ -93,7 +98,9 @@ export function useCreateLimitOrder() {
           },
           onError: (err) => {
             console.error("Create order error:", err);
-            setError(err instanceof Error ? err.message : "Failed to create order");
+            setError(
+              err instanceof Error ? err.message : "Failed to create order",
+            );
           },
         },
       );
@@ -104,7 +111,8 @@ export function useCreateLimitOrder() {
       };
     } catch (err) {
       setIsEncrypting(false);
-      const message = err instanceof Error ? err.message : "Failed to create order";
+      const message =
+        err instanceof Error ? err.message : "Failed to create order";
       setError(message);
       throw err;
     }
@@ -173,7 +181,9 @@ export function useCancelLimitOrder() {
       {
         onSuccess: (hash) => setActiveHash(hash),
         onError: (err) => {
-          setError(err instanceof Error ? err.message : "Failed to cancel order");
+          setError(
+            err instanceof Error ? err.message : "Failed to cancel order",
+          );
         },
       },
     );
@@ -237,7 +247,9 @@ export function useCheckOrders() {
       {
         onSuccess: (hash) => setActiveHash(hash),
         onError: (err) => {
-          setError(err instanceof Error ? err.message : "Failed to check orders");
+          setError(
+            err instanceof Error ? err.message : "Failed to check orders",
+          );
         },
       },
     );
@@ -301,7 +313,9 @@ export function useDepositGas() {
       {
         onSuccess: (hash) => setActiveHash(hash),
         onError: (err) => {
-          setError(err instanceof Error ? err.message : "Failed to deposit gas");
+          setError(
+            err instanceof Error ? err.message : "Failed to deposit gas",
+          );
         },
       },
     );
@@ -366,7 +380,9 @@ export function useClaimOrder() {
       {
         onSuccess: (hash) => setActiveHash(hash),
         onError: (err) => {
-          setError(err instanceof Error ? err.message : "Failed to claim order");
+          setError(
+            err instanceof Error ? err.message : "Failed to claim order",
+          );
         },
       },
     );
@@ -430,7 +446,9 @@ export function useWithdrawGas() {
       {
         onSuccess: (hash) => setActiveHash(hash),
         onError: (err) => {
-          setError(err instanceof Error ? err.message : "Failed to withdraw gas");
+          setError(
+            err instanceof Error ? err.message : "Failed to withdraw gas",
+          );
         },
       },
     );
@@ -456,3 +474,11 @@ export function useWithdrawGas() {
     clearError: () => setError(null),
   };
 }
+
+// TODO: Implement useOnChainOrders to fetch from LOB contract
+// The on-chain orders have encrypted data, so we'd need to:
+// 1. Fetch order counts for each pool via getOrderCount
+// 2. Fetch each order via getOrder
+// 3. Filter by maker address
+// 4. Enrich with local storage for display values (targetPrice, amount)
+// export function useOnChainOrders(...) { ... }

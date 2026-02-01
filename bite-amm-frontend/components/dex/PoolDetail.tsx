@@ -9,6 +9,24 @@ import { useApprove } from "@/lib/hooks/useSwap";
 import { formatUnits, parseUnits } from "viem";
 import { useState, useEffect, useMemo } from "react";
 import { useContracts } from "@/config/contracts";
+import { Eye, EyeOff } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+function formatLargeUSD(value: number): string {
+  if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
+  return `$${value.toFixed(2)}`;
+}
+
+function formatLargeToken(value: number): string {
+  if (value >= 1e12) return `${(value / 1e12).toFixed(4)}T`;
+  if (value >= 1e9) return `${(value / 1e9).toFixed(4)}B`;
+  if (value >= 1e6) return `${(value / 1e6).toFixed(4)}M`;
+  if (value >= 1e3) return `${(value / 1e3).toFixed(4)}K`;
+  return value.toFixed(4);
+}
 
 interface PoolDetailProps {
   pairAddress: `0x${string}`;
@@ -162,8 +180,8 @@ function PoolStatsCard({
             <span className="font-semibold text-stone-600 uppercase text-sm tracking-wider">
               {getTokenSymbol(token0)}
             </span>
-            <span className="font-black text-stone-900">
-              {formatUnits(reserve0, 18)}
+            <span className="font-black text-stone-900 break-all">
+              {formatLargeToken(Number(formatUnits(reserve0, 18)))}
             </span>
           </div>
         )}
@@ -172,8 +190,8 @@ function PoolStatsCard({
             <span className="font-semibold text-stone-600 uppercase text-sm tracking-wider">
               {getTokenSymbol(token1)}
             </span>
-            <span className="font-black text-stone-900">
-              {formatUnits(reserve1, 18)}
+            <span className="font-black text-stone-900 break-all">
+              {formatLargeToken(Number(formatUnits(reserve1, 18)))}
             </span>
           </div>
         )}
@@ -182,8 +200,8 @@ function PoolStatsCard({
             <span className="font-semibold text-stone-600 uppercase text-sm tracking-wider">
               LP Tokens
             </span>
-            <span className="font-black text-stone-900">
-              {formatUnits(totalSupply, 18)}
+            <span className="font-black text-stone-900 break-all">
+              {formatLargeToken(Number(formatUnits(totalSupply, 18)))}
             </span>
           </div>
         )}
@@ -227,8 +245,8 @@ function UserPositionCard({
             <span className="font-semibold text-stone-600 uppercase text-sm tracking-wider">
               LP Tokens
             </span>
-            <span className="font-black text-stone-900">
-              {formatUnits(userLpBalance, 18)}
+            <span className="font-black text-stone-900 break-all">
+              {formatLargeToken(Number(formatUnits(userLpBalance, 18)))}
             </span>
           </div>
           <div className="flex justify-between items-center">
@@ -247,16 +265,16 @@ function UserPositionCard({
               <span className="font-semibold text-stone-600">
                 {getTokenSymbol(token0)}
               </span>
-              <span className="font-black text-stone-900">
-                {formatUnits(userReserve0, 18)}
+              <span className="font-black text-stone-900 break-all">
+                {formatLargeToken(Number(formatUnits(userReserve0, 18)))}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-semibold text-stone-600">
                 {getTokenSymbol(token1)}
               </span>
-              <span className="font-black text-stone-900">
-                {formatUnits(userReserve1, 18)}
+              <span className="font-black text-stone-900 break-all">
+                {formatLargeToken(Number(formatUnits(userReserve1, 18)))}
               </span>
             </div>
           </div>
@@ -283,6 +301,7 @@ function AddLiquidityModal({
 }) {
   const { address } = useAccount();
   const contracts = useContracts();
+  const [useEncryption, setUseEncryption] = useState(true); // Default: BITE encrypted
   const { data: token0Info } = useTokenInfo(token0);
   const { data: token1Info } = useTokenInfo(token1);
 
@@ -413,6 +432,7 @@ function AddLiquidityModal({
       amount0Min,
       amount1Min,
       address,
+      useEncryption,
     );
   };
 
@@ -436,44 +456,66 @@ function AddLiquidityModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-stone-50 border-3 border-black brutalist-shadow-lg rounded-2xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-stone-50 border-3 border-black brutalist-shadow-lg rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-5">
           <h2 className="text-xl font-black text-stone-900 tracking-tight uppercase">
             Add Liquidity
           </h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center bg-stone-200 hover:bg-stone-300 border-2 border-black rounded-lg font-bold text-stone-900 transition-colors"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Encryption Toggle */}
+            <button
+              type="button"
+              onClick={() => setUseEncryption(!useEncryption)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg border-2 border-solid px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all hover:translate-y-0.5 active:translate-y-[3px]",
+                useEncryption
+                  ? "bg-primary text-primary-foreground border-primary brutalist-shadow-sm hover:shadow-[1px_1px_0_0_#000]"
+                  : "bg-stone-100 text-stone-900 border-black hover:bg-stone-200 brutalist-shadow-sm hover:shadow-[1px_1px_0_0_#000]",
+              )}
+              title={
+                useEncryption ? "BITE Encrypted (on)" : "Not Encrypted (off)"
+              }
+            >
+              {useEncryption ? (
+                <Eye className="h-3.5 w-3.5" />
+              ) : (
+                <EyeOff className="h-3.5 w-3.5" />
+              )}
+            </button>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center bg-stone-200 hover:bg-stone-300 border-2 border-black rounded-lg font-bold text-stone-900 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4">
           {/* Token 0 Input */}
           <div className="bg-white border-2 border-black brutalist-shadow rounded-xl p-4">
-            <div className="flex justify-between items-start mb-3">
-              <div>
+            <div className="flex justify-between items-start gap-3 mb-3 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-stone-500 uppercase tracking-wider">
                   Token 1
                 </p>
-                <p className="text-lg font-black text-stone-900 uppercase">
+                <p className="text-lg font-black text-stone-900 uppercase truncate">
                   {token0Info?.symbol ?? "????"}
                 </p>
                 <p className="text-[10px] text-stone-400 font-mono">
                   {token0.slice(0, 8)}...{token0.slice(-6)}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-stone-900">
-                  {isFinite(bal0) ? bal0.toFixed(4) : "0.0000"}
+              <div className="text-right min-w-0">
+                <p className="text-sm font-bold text-stone-900 break-all leading-tight">
+                  {isFinite(bal0) ? formatLargeToken(bal0) : "0.0000"}
                 </p>
                 <p className="text-[10px] font-semibold text-stone-500 uppercase">
                   {token0Info?.symbol ?? "????"} Balance
                 </p>
                 {usd0 !== null && (
-                  <p className="text-[10px] font-bold text-emerald-600">
-                    ${usd0.toFixed(2)}
+                  <p className="text-[10px] font-bold text-emerald-600 break-all leading-tight">
+                    {formatLargeUSD(usd0)}
                   </p>
                 )}
               </div>
@@ -493,28 +535,28 @@ function AddLiquidityModal({
 
           {/* Token 1 Input */}
           <div className="bg-white border-2 border-black brutalist-shadow rounded-xl p-4">
-            <div className="flex justify-between items-start mb-3">
-              <div>
+            <div className="flex justify-between items-start gap-3 mb-3 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-stone-500 uppercase tracking-wider">
                   Token 2
                 </p>
-                <p className="text-lg font-black text-stone-900 uppercase">
+                <p className="text-lg font-black text-stone-900 uppercase truncate">
                   {token1Info?.symbol ?? "????"}
                 </p>
                 <p className="text-[10px] text-stone-400 font-mono">
                   {token1.slice(0, 8)}...{token1.slice(-6)}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-stone-900">
-                  {isFinite(bal1) ? bal1.toFixed(4) : "0.0000"}
+              <div className="text-right min-w-0">
+                <p className="text-sm font-bold text-stone-900 break-all leading-tight">
+                  {isFinite(bal1) ? formatLargeToken(bal1) : "0.0000"}
                 </p>
                 <p className="text-[10px] font-semibold text-stone-500 uppercase">
                   {token1Info?.symbol ?? "????"} Balance
                 </p>
                 {usd1 !== null && (
-                  <p className="text-[10px] font-bold text-emerald-600">
-                    ${usd1.toFixed(2)}
+                  <p className="text-[10px] font-bold text-emerald-600 break-all leading-tight">
+                    {formatLargeUSD(usd1)}
                   </p>
                 )}
               </div>

@@ -1,11 +1,30 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useCallback } from 'react';
-import { useAccount, useBalance } from 'wagmi';
-import { Search, ChevronDown } from 'lucide-react';
-import { cn, shortenAddress, formatBigInt } from '@/lib/utils';
-import { Dialog } from '@/components/ui/Dialog';
-import { useCoinbasePrice } from '@/lib/hooks/useCoinbasePrice';
+import { useState, useMemo, useCallback } from "react";
+import { useAccount, useBalance } from "wagmi";
+import { Search, ChevronDown } from "lucide-react";
+import { cn, shortenAddress, formatBigInt } from "@/lib/utils";
+import { Dialog } from "@/components/ui/Dialog";
+import { useCoinbasePrice } from "@/lib/hooks/useCoinbasePrice";
+
+// Format large token numbers with K/M/B suffixes
+function formatLargeToken(value: number): string {
+  if (value >= 1e12) return `${(value / 1e12).toFixed(4)}T`;
+  if (value >= 1e9) return `${(value / 1e9).toFixed(4)}B`;
+  if (value >= 1e6) return `${(value / 1e6).toFixed(4)}M`;
+  if (value >= 1e3) return `${(value / 1e3).toFixed(4)}K`;
+  // For smaller numbers, show up to 6 decimal places but remove trailing zeros
+  return value.toFixed(6).replace(/\.?0+$/, "");
+}
+
+// Format USD values with K/M/B suffixes
+function formatLargeUSD(value: number): string {
+  if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
+  return `$${value.toFixed(2)}`;
+}
 
 export interface TokenInfo {
   address: `0x${string}`;
@@ -41,27 +60,31 @@ export function TokenSelector({
   selectedToken,
   onSelect,
   disabled = false,
-  label = 'Select token',
+  label = "Select token",
   availableTokens = [],
   chainId,
 }: TokenSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const { address: walletAddress } = useAccount();
 
   // Fetch balance for selected token (for display on button)
   const { data: selectedBalance } = useBalance({
     address: walletAddress,
-    token: selectedToken?.address === '0x0000000000000000000000000000000000000000'
-      ? undefined
-      : selectedToken?.address,
+    token:
+      selectedToken?.address === "0x0000000000000000000000000000000000000000"
+        ? undefined
+        : selectedToken?.address,
   });
 
   // Fetch USD price for selected token
-  const { data: selectedUsdPrice } = useCoinbasePrice(selectedToken?.coinbaseId);
+  const { data: selectedUsdPrice } = useCoinbasePrice(
+    selectedToken?.coinbaseId,
+  );
 
   // Fetch all token balances and prices for ranking
-  const [sortedTokens, setSortedTokens] = useState<TokenInfo[]>(availableTokens);
+  const [sortedTokens, setSortedTokens] =
+    useState<TokenInfo[]>(availableTokens);
 
   // Filter tokens by search query
   const filteredTokens = useMemo(() => {
@@ -82,15 +105,17 @@ export function TokenSelector({
     (token: TokenInfo) => {
       onSelect(token);
       setIsOpen(false);
-      setSearchQuery('');
+      setSearchQuery("");
     },
-    [onSelect]
+    [onSelect],
   );
 
   // Calculate USD value for display
   const selectedUsdValue = useMemo(() => {
     if (!selectedBalance || !selectedUsdPrice) return null;
-    const balance = parseFloat(formatBigInt(selectedBalance.value, selectedBalance.decimals));
+    const balance = parseFloat(
+      formatBigInt(selectedBalance.value, selectedBalance.decimals),
+    );
     return balance * selectedUsdPrice;
   }, [selectedBalance, selectedUsdPrice]);
 
@@ -102,7 +127,7 @@ export function TokenSelector({
         onClick={() => !disabled && setIsOpen(true)}
         disabled={disabled}
         className={cn(
-          'flex h-14 w-full items-center justify-between rounded-xl border-3 border-black bg-white px-4 text-stone-900 transition-all hover:translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_#000] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-x-0 disabled:hover:-translate-y-0'
+          "flex h-14 w-full items-center justify-between rounded-xl border-3 border-black bg-white px-4 text-stone-900 transition-all hover:translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_#000] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-x-0 disabled:hover:-translate-y-0",
         )}
       >
         <div className="flex items-center gap-3">
@@ -115,28 +140,40 @@ export function TokenSelector({
                   return iconUrl ? (
                     <img
                       src={iconUrl}
-                      alt={selectedToken.symbol ?? 'Token'}
+                      alt={selectedToken.symbol ?? "Token"}
                       className="h-full w-full object-cover"
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                        if (fallback) fallback.classList.remove('hidden');
+                        e.currentTarget.style.display = "none";
+                        const fallback = e.currentTarget
+                          .nextElementSibling as HTMLElement;
+                        if (fallback) fallback.classList.remove("hidden");
                       }}
                     />
                   ) : null;
                 })()}
                 <span
                   className="text-lg font-black text-white hidden"
-                  style={{ backgroundColor: getTokenColor(selectedToken.symbol) }}
+                  style={{
+                    backgroundColor: getTokenColor(selectedToken.symbol),
+                  }}
                 >
-                  {selectedToken.symbol?.slice(0, 2) ?? '??'}
+                  {selectedToken.symbol?.slice(0, 2) ?? "??"}
                 </span>
               </div>
               <div className="text-left">
-                <div className="font-black uppercase tracking-wider">{selectedToken.symbol}</div>
+                <div className="font-black uppercase tracking-wider">
+                  {selectedToken.symbol}
+                </div>
                 {selectedBalance && (
                   <div className="text-xs font-semibold text-stone-500">
-                    {formatBigInt(selectedBalance.value, selectedBalance.decimals)}
+                    {formatLargeToken(
+                      parseFloat(
+                        formatBigInt(
+                          selectedBalance.value,
+                          selectedBalance.decimals,
+                        ),
+                      ),
+                    )}
                   </div>
                 )}
               </div>
@@ -149,7 +186,7 @@ export function TokenSelector({
           {selectedToken && selectedUsdValue !== null && (
             <div className="text-right">
               <div className="text-sm font-black text-stone-900">
-                ${selectedUsdValue.toFixed(2)}
+                {formatLargeUSD(selectedUsdValue)}
               </div>
             </div>
           )}
@@ -207,20 +244,23 @@ function TokenList({
   const tokensWithData = tokens.map((token) => {
     const { data: balance } = useBalance({
       address: walletAddress as `0x${string}` | undefined,
-      token: token.address === '0x0000000000000000000000000000000000000000'
-        ? undefined
-        : token.address,
+      token:
+        token.address === "0x0000000000000000000000000000000000000000"
+          ? undefined
+          : token.address,
     });
 
     const { data: usdPrice } = useCoinbasePrice(token.coinbaseId);
 
     const balanceFormatted = balance
-      ? formatBigInt(balance.value, balance.decimals)
-      : '0';
+      ? formatLargeToken(
+          parseFloat(formatBigInt(balance.value, balance.decimals)),
+        )
+      : "0";
 
     const usdValue =
       balance && usdPrice
-        ? parseFloat(balanceFormatted) * usdPrice
+        ? parseFloat(formatBigInt(balance.value, balance.decimals)) * usdPrice
         : 0;
 
     return {
@@ -270,12 +310,12 @@ function getTokenIconUrl(symbol?: string): string | undefined {
 
   // Map token symbols to their icon URLs
   const iconMap: Record<string, string> = {
-    USDC: 'https://tokens.1inch.io/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.png',
-    USDT: 'https://tokens.1inch.io/0xdac17f958d2ee523a2206206994597c13d831ec7.png',
-    WBTC: 'https://tokens.1inch.io/0x2260fac5e5542a773aa44fbcfedf7c193bc2c599.png',
-    WETH: 'https://tokens.1inch.io/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2.png',
-    ETH: 'https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png',
-    FAI: 'https://tokens.1inch.io/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.png', // Fallback to USDC
+    USDC: "https://tokens.1inch.io/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.png",
+    USDT: "https://tokens.1inch.io/0xdac17f958d2ee523a2206206994597c13d831ec7.png",
+    WBTC: "https://tokens.1inch.io/0x2260fac5e5542a773aa44fbcfedf7c193bc2c599.png",
+    WETH: "https://tokens.1inch.io/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2.png",
+    ETH: "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
+    FAI: "https://tokens.1inch.io/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.png", // Fallback to USDC
   };
 
   return iconMap[symbol.toUpperCase()];
@@ -283,17 +323,17 @@ function getTokenIconUrl(symbol?: string): string | undefined {
 
 // Get token background color for fallback icon
 function getTokenColor(symbol?: string): string {
-  if (!symbol) return '#6366f1'; // default indigo
+  if (!symbol) return "#6366f1"; // default indigo
 
   const colorMap: Record<string, string> = {
-    USDC: '#2775CA',
-    USDT: '#26A17B',
-    WBTC: '#F7931A',
-    WETH: '#627EEA',
-    ETH: '#627EEA',
+    USDC: "#2775CA",
+    USDT: "#26A17B",
+    WBTC: "#F7931A",
+    WETH: "#627EEA",
+    ETH: "#627EEA",
   };
 
-  return colorMap[symbol.toUpperCase()] || '#6366f1';
+  return colorMap[symbol.toUpperCase()] || "#6366f1";
 }
 
 // Token List Item Component
@@ -318,12 +358,12 @@ function TokenListItem({
         {iconUrl ? (
           <img
             src={iconUrl}
-            alt={token.symbol ?? 'Token'}
+            alt={token.symbol ?? "Token"}
             className="h-full w-full object-cover"
             onError={(e) => {
               // Fallback to text if image fails
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              e.currentTarget.style.display = "none";
+              e.currentTarget.nextElementSibling?.classList.remove("hidden");
             }}
           />
         ) : null}
@@ -331,14 +371,16 @@ function TokenListItem({
           className="text-lg font-black text-white hidden"
           style={{ backgroundColor: bgColor }}
         >
-          {token.symbol?.slice(0, 2) ?? '??'}
+          {token.symbol?.slice(0, 2) ?? "??"}
         </span>
       </div>
 
       {/* Token Info */}
       <div className="flex flex-1 items-center justify-between">
         <div>
-          <div className="font-black text-stone-900 uppercase tracking-wider">{token.symbol}</div>
+          <div className="font-black text-stone-900 uppercase tracking-wider">
+            {token.symbol}
+          </div>
           <div className="text-xs font-semibold text-stone-500 font-mono">
             {shortenAddress(token.address)}
           </div>
@@ -347,11 +389,11 @@ function TokenListItem({
         {/* Balance & USD Value */}
         <div className="text-right">
           <div className="font-black text-stone-900">
-            {token.balanceFormatted ?? '0'}
+            {token.balanceFormatted ?? "0"}
           </div>
           {token.usdValue !== undefined && token.usdValue > 0 && (
             <div className="text-xs font-semibold text-stone-500">
-              ${token.usdValue.toFixed(2)}
+              {formatLargeUSD(token.usdValue)}
             </div>
           )}
         </div>

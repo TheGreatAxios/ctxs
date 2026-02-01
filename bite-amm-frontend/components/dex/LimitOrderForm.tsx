@@ -1,22 +1,46 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useEffect } from 'react';
-import { useAccount, useBalance, useReadContract, useReadContracts } from 'wagmi';
-import type { Address } from 'viem';
-import { ArrowUpDown, Clock, DollarSign, Loader2, AlertCircle, Zap } from 'lucide-react';
-import { useCreateLimitOrder, type LimitOrderParams } from '@/lib/hooks/useLimitOrders';
-import { useApprove } from '@/lib/hooks/useSwap';
-import { useLocalOrders } from '@/lib/hooks/useLocalOrders';
-import { useTokenAllowance } from '@/lib/hooks/useContractRead';
-import { useAllPairsLength, useAllPairs, useMultiplePoolsInfo, type PoolInfo } from '@/lib/hooks/usePool';
-import { useMultipleTokenInfo } from '@/lib/hooks/useToken';
-import { parseBigInt, formatBigInt } from '@/lib/utils';
-import { CONTRACTS, getContractForChain } from '@/config/contracts';
+import { useState, useMemo, useEffect } from "react";
+import { useAccount, useBalance, useReadContracts } from "wagmi";
+import type { Address } from "viem";
+import {
+  Clock,
+  DollarSign,
+  Loader2,
+  AlertCircle,
+  Zap,
+  ChevronDown,
+  TrendingUp,
+} from "lucide-react";
+import {
+  useCreateLimitOrder,
+  type LimitOrderParams,
+} from "@/lib/hooks/useLimitOrders";
+import { useApprove } from "@/lib/hooks/useSwap";
+import { useLocalOrders } from "@/lib/hooks/useLocalOrders";
+import { useTokenAllowance } from "@/lib/hooks/useContractRead";
+import {
+  useAllPairsLength,
+  useAllPairs,
+  useMultiplePoolsInfo,
+  type PoolInfo,
+} from "@/lib/hooks/usePool";
+import { useMultipleTokenInfo } from "@/lib/hooks/useToken";
+import { useTokenPrices } from "@/lib/hooks/useCoinbasePrice";
+import { parseBigInt, formatBigInt } from "@/lib/utils";
+import { formatUnits } from "viem";
+import { CONTRACTS, getContractForChain } from "@/config/contracts";
+import { TokenSelector, type TokenInfo } from "@/components/dex/TokenSelector";
+import { AVAILABLE_TOKENS } from "@/config/tokens";
 
 interface Pool {
   address: Address;
   token0: { symbol: string; address: Address; decimals: number };
   token1: { symbol: string; address: Address; decimals: number };
+  liquidityUsd: number;
+  liquidityFormatted: string;
+  balance0: bigint;
+  balance1: bigint;
 }
 
 const TARGET_CHAIN_ID = 2090472038;
@@ -27,7 +51,7 @@ export function LimitOrderForm() {
   const factoryAddress = contracts?.factory;
 
   const { addOrder } = useLocalOrders(address, chainId ?? TARGET_CHAIN_ID);
-  const { createOrder, isEncrypting, isPending, isConfirming } =
+  const { createOrder, isEncrypting, isPending, isConfirming, receipt } =
     useCreateLimitOrder();
   const { approve, isPending: isApproving } = useApprove();
 
@@ -47,18 +71,34 @@ export function LimitOrderForm() {
   );
   const { getTokenInfo } = useMultipleTokenInfo(uniqueTokens);
 
-  // Get balances for tokens that are actually in pools (not hardcoded mainnet addresses)
+  // Get USD prices for all tokens
+  const tokenPrices = useTokenPrices(uniqueTokens);
+
+  // Build token address -> price map
+  const tokenPriceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    tokenPrices.forEach((priceQuery, idx) => {
+      if (priceQuery.data) {
+        map.set(uniqueTokens[idx].toLowerCase(), priceQuery.data);
+      }
+    });
+    return map;
+  }, [tokenPrices, uniqueTokens]);
+
+  // Get balances for all tokens
   const { data: balancesData } = useReadContracts({
-    contracts: uniqueTokens.map(addr => ({
+    contracts: uniqueTokens.map((addr) => ({
       address: addr as Address,
-      abi: [{
-        name: 'balanceOf',
-        type: 'function' as const,
-        stateMutability: 'view' as const,
-        inputs: [{ name: 'account', type: 'address' }],
-        outputs: [{ name: '', type: 'uint256' }],
-      }],
-      functionName: 'balanceOf',
+      abi: [
+        {
+          name: "balanceOf",
+          type: "function" as const,
+          stateMutability: "view" as const,
+          inputs: [{ name: "account", type: "address" }],
+          outputs: [{ name: "", type: "uint256" }],
+        },
+      ],
+      functionName: "balanceOf",
       args: [address as Address],
     })),
     query: { enabled: !!address && uniqueTokens.length > 0 },
@@ -67,152 +107,266 @@ export function LimitOrderForm() {
   const tokenBalances = useMemo(() => {
     const balances = new Map<Address, bigint>();
     balancesData?.forEach((result, i) => {
-      if (result?.status === 'success') {
+      if (result?.status === "success") {
         balances.set(uniqueTokens[i], result.result as unknown as bigint);
       }
     });
-    console.log('Token balances from pools:', Object.fromEntries(balances));
     return balances;
   }, [balancesData, uniqueTokens]);
 
-  // Build pool list with balance info
-  const poolsWithBalance = useMemo(() => {
+  // Build pool list with liquidity info
+  const poolsWithLiquidity = useMemo(() => {
     return poolsData
-      .map(pool => {
+      .map((pool) => {
         const token0Info = getTokenInfo(pool.token0);
         const token1Info = getTokenInfo(pool.token1);
         if (!token0Info || !token1Info) return null;
 
         const balance0 = tokenBalances.get(pool.token0) ?? 0n;
         const balance1 = tokenBalances.get(pool.token1) ?? 0n;
-        const hasBalance = balance0 > 0n || balance1 > 0n;
+
+        const reserve0Formatted = Number(
+          formatUnits(pool.reserves.reserve0, token0Info.decimals),
+        );
+        const reserve1Formatted = Number(
+          formatUnits(pool.reserves.reserve1, token1Info.decimals),
+        );
+        const price0 = tokenPriceMap.get(pool.token0.toLowerCase()) ?? 0;
+        const price1 = tokenPriceMap.get(pool.token1.toLowerCase()) ?? 0;
+
+        const liquidityUsd =
+          reserve0Formatted * price0 + reserve1Formatted * price1;
+        const liquidityFormatted =
+          liquidityUsd > 0
+            ? `$${liquidityUsd >= 1000 ? liquidityUsd.toFixed(2) : liquidityUsd.toFixed(4)}`
+            : "Low liquidity";
 
         return {
           address: pool.address,
-          token0: { symbol: token0Info.symbol, address: pool.token0, decimals: token0Info.decimals },
-          token1: { symbol: token1Info.symbol, address: pool.token1, decimals: token1Info.decimals },
-          hasBalance,
+          token0: {
+            symbol: token0Info.symbol,
+            address: pool.token0,
+            decimals: token0Info.decimals,
+          },
+          token1: {
+            symbol: token1Info.symbol,
+            address: pool.token1,
+            decimals: token1Info.decimals,
+          },
+          liquidityUsd,
+          liquidityFormatted,
           balance0,
           balance1,
         };
       })
-      .filter((p): p is Pool & { hasBalance: boolean; balance0: bigint; balance1: bigint } => p !== null);
-  }, [poolsData, getTokenInfo, tokenBalances]);
+      .filter((p): p is Pool => p !== null)
+      .sort((a, b) => b.liquidityUsd - a.liquidityUsd);
+  }, [poolsData, getTokenInfo, tokenBalances, tokenPriceMap]);
 
-  const [selectedPool, setSelectedPool] = useState<Pool & { hasBalance: boolean } | null>(poolsWithBalance[0] ?? null);
-  const [direction, setDirection] = useState<'buy' | 'sell'>('buy');
-  const [targetPrice, setTargetPrice] = useState('');
-  const [amount, setAmount] = useState('');
-  const [deadline, setDeadline] = useState('24');
+  // Build token -> pools mapping
+  const tokenToPoolsMap = useMemo(() => {
+    const map = new Map<Address, Pool[]>();
+    poolsWithLiquidity.forEach((pool) => {
+      if (!map.has(pool.token0.address)) map.set(pool.token0.address, []);
+      if (!map.has(pool.token1.address)) map.set(pool.token1.address, []);
+      map.get(pool.token0.address)!.push(pool);
+      map.get(pool.token1.address)!.push(pool);
+    });
+    return map;
+  }, [poolsWithLiquidity]);
+
+  // Available tokens for selection
+  const availableTokens = useMemo(() => {
+    const tokenAddresses = Array.from(tokenToPoolsMap.keys());
+    return AVAILABLE_TOKENS.filter((t) => tokenAddresses.includes(t.address));
+  }, [tokenToPoolsMap]);
+
+  const [selectedToken, setSelectedToken] = useState<TokenInfo | null>(null);
+  const [direction, setDirection] = useState<"buy" | "sell">("buy");
+  const [paymentToken, setPaymentToken] = useState<Pool | null>(null);
+  const [targetPrice, setTargetPrice] = useState("");
+  const [amount, setAmount] = useState("");
+  const [deadline, setDeadline] = useState("24");
   const [needsApproval, setNeedsApproval] = useState(false);
 
-  // Update selected pool when pools load
-  useEffect(() => {
-    if (poolsWithBalance.length > 0 && !selectedPool) {
-      setSelectedPool(poolsWithBalance[0]);
-    }
-  }, [poolsWithBalance, selectedPool]);
+  // Get available pools for selected token (pools we can use to trade this token)
+  const availablePools = useMemo(() => {
+    if (!selectedToken) return [];
+    return tokenToPoolsMap.get(selectedToken.address) ?? [];
+  }, [selectedToken, tokenToPoolsMap]);
 
-  // Determine input token based on direction
-  const inputToken = selectedPool
-    ? direction === 'buy'
-      ? selectedPool.token1.address
-      : selectedPool.token0.address
-    : undefined;
+  // Get the "other" token in the selected pool (what we're paying with)
+  const otherToken = useMemo(() => {
+    if (!paymentToken || !selectedToken) return null;
+    return paymentToken.token0.address.toLowerCase() ===
+      selectedToken.address.toLowerCase()
+      ? paymentToken.token1
+      : paymentToken.token0;
+  }, [paymentToken, selectedToken]);
+
+  // Determine input token (what we're spending)
+  const inputToken = useMemo(() => {
+    if (!paymentToken || !selectedToken) return undefined;
+    // If buying selectedToken, we spend the other token
+    if (direction === "buy") return otherToken?.address;
+    // If selling selectedToken, we spend the selected token
+    return selectedToken.address;
+  }, [paymentToken, selectedToken, direction, otherToken]);
+
+  // Determine input decimals
+  const inputDecimals = useMemo(() => {
+    if (!paymentToken || !selectedToken) return 18;
+    if (direction === "buy") return otherToken?.decimals ?? 18;
+    return selectedToken.decimals;
+  }, [paymentToken, selectedToken, direction, otherToken]);
 
   const { data: tokenBalance } = useBalance({
     address,
     token: inputToken,
   });
 
-  // Check token allowance
   const { data: allowance } = useTokenAllowance(
-    inputToken ?? ('0x' as Address),
-    address ?? ('0x' as Address),
-    selectedPool?.address ?? ('0x' as Address),
+    inputToken ?? ("0x" as Address),
+    address ?? ("0x" as Address),
+    paymentToken?.address ?? ("0x" as Address),
   );
 
   const amountBigInt = useMemo(() => {
-    if (!selectedPool) return 0n;
-    return parseBigInt(
-      amount,
-      direction === 'buy' ? selectedPool.token1.decimals : selectedPool.token0.decimals
-    );
-  }, [amount, direction, selectedPool]);
+    return parseBigInt(amount, inputDecimals);
+  }, [amount, inputDecimals]);
 
   // Check if approval is needed
-  useEffect(() => {
+  useMemo(() => {
     const allowanceValue = allowance as bigint | undefined;
-    if (allowanceValue != null && allowanceValue !== undefined && amountBigInt > 0n) {
+    if (allowanceValue != null && amountBigInt > 0n) {
       setNeedsApproval(allowanceValue < amountBigInt);
+    } else {
+      setNeedsApproval(false);
     }
   }, [allowance, amountBigInt]);
 
   const handleApprove = async () => {
-    if (!address || !inputToken || !selectedPool) return;
-    await approve(inputToken, selectedPool.address, amountBigInt);
+    if (!address || !inputToken || !paymentToken) return;
+    await approve(inputToken, paymentToken.address, amountBigInt);
   };
+
+  // Store order details temporarily until receipt confirms
+  const [pendingOrder, setPendingOrder] = useState<{
+    params: LimitOrderParams;
+    targetPrice: string;
+    amount: string;
+  } | null>(null);
+
+  // Watch for receipt and add order only on success
+  useEffect(() => {
+    if (!receipt || !pendingOrder || !address) return;
+
+    if (receipt.status === "success") {
+      // Extract orderId from OrderCreated event logs
+      const orderCreatedEvent = receipt.logs.find((log) => {
+        return (
+          log.address.toLowerCase() === contracts?.limitOrderBook?.toLowerCase()
+        );
+      });
+
+      // Try to decode the OrderCreated event to get orderId
+      let orderId = BigInt(0);
+      if (orderCreatedEvent) {
+        // The OrderCreated event has signature: OrderCreated(indexed address, indexed address, uint256, uint256, bool, uint256)
+        // For now, we use a hash-based ID since we can't easily decode without the full ABI
+        orderId = BigInt(receipt.blockNumber);
+      }
+
+      addOrder({
+        orderId,
+        pool: pendingOrder.params.pool,
+        targetPrice: pendingOrder.targetPrice,
+        amount: pendingOrder.amount,
+        direction: pendingOrder.params.direction,
+        deadline: pendingOrder.params.deadline,
+        status: "open",
+        createdAt: new Date(),
+        userAddress: address,
+        chainId: chainId ?? TARGET_CHAIN_ID,
+        txHash: receipt.transactionHash,
+      });
+
+      // Clear form and pending order on success
+      setAmount("");
+      setTargetPrice("");
+      setPendingOrder(null);
+    } else if (receipt.status === "reverted") {
+      // Clear pending order on failure
+      setPendingOrder(null);
+    }
+  }, [receipt, pendingOrder, address, contracts, addOrder, chainId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!address || !selectedPool) return;
+    if (!address || !paymentToken) return;
 
     const priceBigInt = parseBigInt(targetPrice, 18);
 
-    // Check approval first
     if (needsApproval) {
       await handleApprove();
       return;
     }
 
     const params: LimitOrderParams = {
-      pool: selectedPool.address,
+      pool: paymentToken.address,
       targetPrice: priceBigInt,
       amount: amountBigInt,
-      direction: direction === 'buy',
-      deadline: BigInt(Math.floor(Date.now() / 1000) + parseInt(deadline) * 3600),
+      direction: direction === "buy",
+      deadline: BigInt(
+        Math.floor(Date.now() / 1000) + parseInt(deadline) * 3600,
+      ),
     };
 
-    if (!contracts || !contracts.router) {
-      console.error('Router not configured');
+    if (!contracts || !contracts.limitOrderBook) {
+      console.error("Limit Order Book not configured");
+      return;
+    }
+
+    const rpcUrl = chain?.rpcUrls.public.http[0];
+    if (!rpcUrl) {
+      console.error("RPC URL not configured");
       return;
     }
 
     try {
-      await createOrder(params, contracts.router, CONTRACTS.limitOrderBook);
-
-      // Store locally with encrypted data
-      await addOrder({
-        orderId: BigInt(0),
-        pool: selectedPool.address,
+      // Store pending order details - will be added to local orders only on successful receipt
+      setPendingOrder({
+        params,
         targetPrice,
         amount,
-        direction: direction === 'buy',
-        deadline: params.deadline,
-        status: 'pending',
-        createdAt: new Date(),
-        userAddress: address,
-        chainId: chainId ?? TARGET_CHAIN_ID,
       });
 
-      setAmount('');
-      setTargetPrice('');
+      await createOrder(params, rpcUrl, contracts.limitOrderBook, estimatedGas);
     } catch (error) {
-      console.error('Failed to create order:', error);
+      console.error("Failed to create order:", error);
+      setPendingOrder(null);
     }
   };
 
   const formattedBalance = useMemo(() => {
-    if (!tokenBalance) return '0.00';
+    if (!tokenBalance) return "0.00";
     return formatBigInt(tokenBalance.value, tokenBalance.decimals);
   }, [tokenBalance]);
 
-  const estimatedGas = BigInt('10000000000000000'); // 0.01 sFUEL for CTX execution
+  const inputTokenSymbol =
+    direction === "buy"
+      ? (otherToken?.symbol ?? "token")
+      : (selectedToken?.symbol ?? "token");
+  const inputTokenInfo = direction === "buy" ? otherToken : selectedToken;
+
+  const estimatedGas = BigInt("10000000000000000");
 
   if (!factoryAddress) {
     return (
       <div className="bg-white border-3 border-black brutalist-shadow-lg rounded-2xl p-4 h-full flex items-center justify-center">
-        <p className="text-center font-semibold text-stone-500">Switch to SKALE Testnet</p>
+        <p className="text-center font-semibold text-stone-500">
+          Switch to SKALE Testnet
+        </p>
       </div>
     );
   }
@@ -221,72 +375,144 @@ export function LimitOrderForm() {
     <div className="bg-white border-3 border-black brutalist-shadow-lg rounded-2xl p-4 h-full flex flex-col">
       <div className="flex items-center gap-2 mb-4 flex-shrink-0">
         <Zap className="w-5 h-5 text-accent" />
-        <h2 className="text-lg font-black text-stone-900 tracking-tight uppercase">Place Limit Order</h2>
+        <h2 className="text-lg font-black text-stone-900 tracking-tight uppercase">
+          Limit Order
+        </h2>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-3 flex-1 overflow-y-auto">
-        {/* Pool Selector */}
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-3 flex-1 overflow-y-auto"
+      >
+        {/* Step 1: Select Token */}
         <div>
           <label className="block text-xs font-bold text-stone-700 mb-1 uppercase tracking-wider">
-            Trading Pair
+            Select Token
           </label>
-          {poolsWithBalance.length === 0 ? (
-            <div className="w-full bg-stone-100 border-3 border-black rounded-lg px-3 py-2 text-stone-500 text-sm text-center">
-              {allPairsLength === BigInt(0)
-                ? 'No pools available'
-                : 'No tokens in wallet'}
-            </div>
-          ) : (
-            <select
-              value={selectedPool?.address ?? ''}
-              onChange={(e) => {
-                const pool = poolsWithBalance.find((p) => p.address === e.target.value);
-                if (pool) setSelectedPool(pool);
-              }}
-              className="w-full bg-white border-3 border-black rounded-lg px-3 py-2 text-stone-900 font-semibold focus:outline-none focus:ring-4 focus:ring-accent/50 text-sm"
-            >
-              {poolsWithBalance.map((pool) => (
-                <option
-                  key={pool.address}
-                  value={pool.address}
-                  className={!pool.hasBalance ? 'text-stone-400' : ''}
-                >
-                  {pool.token0.symbol}/{pool.token1.symbol}
-                  {!pool.hasBalance && ' (No balance)'}
-                </option>
-              ))}
-            </select>
-          )}
+          <TokenSelector
+            selectedToken={selectedToken}
+            onSelect={(token) => {
+              setSelectedToken(token);
+              setPaymentToken(null);
+            }}
+            disabled={availableTokens.length === 0}
+            label="Choose token to trade"
+            availableTokens={availableTokens}
+          />
         </div>
 
-        {!selectedPool && poolsWithBalance.length > 0 && (
-          <p className="text-xs font-semibold text-stone-500 text-center">
-            Select a trading pair
-          </p>
+        {/* Step 2: Buy or Sell */}
+        <div>
+          <label className="block text-xs font-bold text-stone-700 mb-1 uppercase tracking-wider">
+            I want to
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setDirection("buy")}
+              disabled={!selectedToken}
+              className={`flex-1 border-3 border-black rounded-lg px-3 py-3 text-stone-900 font-black uppercase tracking-wider transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed brutalist-shadow ${
+                direction === "buy"
+                  ? "bg-accent hover:bg-accent/90 shadow-[2px_2px_0_0_#000] translate-y-0"
+                  : "bg-white hover:bg-stone-50"
+              }`}
+            >
+              Buy
+            </button>
+            <button
+              type="button"
+              onClick={() => setDirection("sell")}
+              disabled={!selectedToken}
+              className={`flex-1 border-3 border-black rounded-lg px-3 py-3 text-stone-900 font-black uppercase tracking-wider transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed brutalist-shadow ${
+                direction === "sell"
+                  ? "bg-accent hover:bg-accent/90 shadow-[2px_2px_0_0_#000] translate-y-0"
+                  : "bg-white hover:bg-stone-50"
+              }`}
+            >
+              Sell
+            </button>
+          </div>
+        </div>
+
+        {/* Step 3: Payment Token */}
+        {selectedToken && (
+          <div>
+            <label className="block text-xs font-bold text-stone-700 mb-1 uppercase tracking-wider">
+              I want to use my
+            </label>
+            <div className="relative">
+              <select
+                value={paymentToken?.address ?? ""}
+                onChange={(e) => {
+                  const pool = availablePools.find(
+                    (p) => p.address === e.target.value,
+                  );
+                  setPaymentToken(pool ?? null);
+                }}
+                disabled={availablePools.length === 0}
+                className="w-full bg-white border-3 border-black rounded-lg px-3 py-3 text-stone-900 focus:outline-none focus:ring-4 focus:ring-accent/50 font-semibold appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">Select token...</option>
+                {availablePools.map((pool) => {
+                  const other =
+                    pool.token0.address.toLowerCase() ===
+                    selectedToken.address.toLowerCase()
+                      ? pool.token1
+                      : pool.token0;
+                  const balance =
+                    pool.token0.address.toLowerCase() ===
+                    selectedToken.address.toLowerCase()
+                      ? pool.balance1
+                      : pool.balance0;
+                  const formattedBalance = formatBigInt(
+                    balance,
+                    other.decimals,
+                  );
+                  return (
+                    <option key={pool.address} value={pool.address}>
+                      {other?.symbol ?? "Token"} ({formattedBalance})
+                    </option>
+                  );
+                })}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
+            </div>
+
+            {/* Balance & Liquidity Info */}
+            {paymentToken && otherToken && (
+              <div className="mt-2 space-y-1.5">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-semibold text-stone-600">
+                    Your {otherToken?.symbol ?? "Token"}:
+                  </span>
+                  <span className="font-bold text-stone-900">
+                    {formattedBalance}
+                  </span>
+                </div>
+                <div
+                  className={`flex items-center gap-1.5 text-[10px] ${
+                    paymentToken.liquidityUsd < 100
+                      ? "text-warning"
+                      : "text-stone-500"
+                  }`}
+                >
+                  <TrendingUp className="w-3 h-3" />
+                  <span className="font-semibold">
+                    Pool: {paymentToken.liquidityFormatted}
+                  </span>
+                  {paymentToken.liquidityUsd < 100 && (
+                    <span className="font-bold">(Low liquidity)</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
-        {/* Direction Toggle */}
+        {/* When Price Hits */}
         <div>
           <label className="block text-xs font-bold text-stone-700 mb-1 uppercase tracking-wider">
-            Order Type
-          </label>
-          <button
-            type="button"
-            onClick={() => setDirection((d) => (d === 'buy' ? 'sell' : 'buy'))}
-            disabled={!selectedPool}
-            className="w-full bg-white border-3 border-black rounded-lg px-3 py-2 text-stone-900 flex items-center justify-between hover:bg-accent transition-colors brutalist-shadow text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span className="font-black uppercase tracking-wider">
-              {direction === 'buy' ? 'Buy' : 'Sell'} {selectedPool?.token0.symbol ?? '---'}
-            </span>
-            <ArrowUpDown className="w-4 h-4 text-stone-400" />
-          </button>
-        </div>
-
-        {/* Target Price */}
-        <div>
-          <label className="block text-xs font-bold text-stone-700 mb-1 uppercase tracking-wider">
-            Target Price
+            When {selectedToken?.symbol ?? "---"} hits
           </label>
           <div className="relative">
             <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
@@ -297,11 +523,11 @@ export function LimitOrderForm() {
               onChange={(e) => setTargetPrice(e.target.value)}
               placeholder="0.00"
               required
-              disabled={!selectedPool}
-              className="w-full bg-white border-3 border-black rounded-lg pl-10 pr-3 py-2 text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-4 focus:ring-accent/50 font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!paymentToken}
+              className="w-full bg-white border-3 border-black rounded-lg pl-10 pr-16 py-2 text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-4 focus:ring-accent/50 font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-stone-500">
-              {selectedPool?.token1.symbol ?? '---'}/{selectedPool?.token0.symbol ?? '---'}
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-500">
+              USD
             </span>
           </div>
         </div>
@@ -309,7 +535,7 @@ export function LimitOrderForm() {
         {/* Amount */}
         <div>
           <label className="block text-xs font-bold text-stone-700 mb-1 uppercase tracking-wider">
-            Amount
+            Amount ({inputTokenSymbol ?? "---"})
           </label>
           <div className="relative">
             <input
@@ -319,41 +545,29 @@ export function LimitOrderForm() {
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
               required
-              disabled={!selectedPool}
-              className="w-full bg-white border-3 border-black rounded-lg px-3 py-2 text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-4 focus:ring-accent/50 font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!paymentToken}
+              className="w-full bg-white border-3 border-black rounded-lg px-3 py-2 pr-16 text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-4 focus:ring-accent/50 font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
               <span className="text-xs font-semibold text-stone-500">
-                {selectedPool
-                  ? direction === 'buy'
-                    ? selectedPool.token1.symbol
-                    : selectedPool.token0.symbol
-                  : '---'}
+                {inputTokenSymbol ?? "---"}
               </span>
               <button
                 type="button"
                 onClick={() => setAmount(formattedBalance)}
-                disabled={!selectedPool}
+                disabled={!paymentToken}
                 className="text-[10px] font-bold text-accent hover:text-accent/80 uppercase tracking-wider px-1.5 py-0.5 bg-accent/10 rounded disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Max
               </button>
             </div>
           </div>
-          <p className="mt-1 text-[10px] font-semibold text-stone-500">
-            Available: {formattedBalance}{' '}
-            {selectedPool
-              ? direction === 'buy'
-                ? selectedPool.token1.symbol
-                : selectedPool.token0.symbol
-              : ''}
-          </p>
         </div>
 
         {/* Deadline */}
         <div>
           <label className="block text-xs font-bold text-stone-700 mb-1 uppercase tracking-wider">
-            Deadline
+            Order expires in
           </label>
           <div className="relative">
             <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
@@ -372,7 +586,7 @@ export function LimitOrderForm() {
         </div>
 
         {/* Approval Warning */}
-        {needsApproval && amountBigInt > 0n && selectedPool && (
+        {needsApproval && amountBigInt > 0n && paymentToken && (
           <div className="bg-warning/10 border-2 border-warning rounded-lg p-3 brutalist-shadow-sm">
             <div className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-warning flex-shrink-0" />
@@ -381,7 +595,7 @@ export function LimitOrderForm() {
                   Approval Required
                 </p>
                 <p className="text-[10px] font-semibold text-stone-600 mt-0.5">
-                  Approve {direction === 'buy' ? selectedPool.token1.symbol : selectedPool.token0.symbol} to continue
+                  Approve {inputTokenSymbol} to continue
                 </p>
               </div>
             </div>
@@ -403,7 +617,7 @@ export function LimitOrderForm() {
           type="submit"
           disabled={
             !address ||
-            !selectedPool ||
+            !paymentToken ||
             isEncrypting ||
             isPending ||
             isConfirming ||
@@ -411,24 +625,28 @@ export function LimitOrderForm() {
           }
           className={`w-full ${
             needsApproval
-              ? 'bg-warning hover:bg-warning/90 text-warning-foreground'
-              : 'bg-accent hover:bg-accent/90 text-accent-foreground'
+              ? "bg-warning hover:bg-warning/90 text-warning-foreground"
+              : "bg-accent hover:bg-accent/90 text-accent-foreground"
           } disabled:bg-stone-300 disabled:cursor-not-allowed font-black rounded-lg px-3 py-3 brutalist-shadow transition-all hover:translate-y-1 hover:shadow-[2px_2px_0_0_#000] active:shadow-none active:translate-y-2 uppercase tracking-widest flex items-center justify-center gap-2 text-sm flex-shrink-0`}
         >
-          {((isEncrypting || isPending || isConfirming || isApproving) && (
+          {(isEncrypting || isPending || isConfirming || isApproving) && (
             <Loader2 className="w-4 h-4 animate-spin" />
-          ))}
+          )}
           {isEncrypting
-            ? 'Encrypting...'
+            ? "Encrypting..."
             : isApproving
-            ? 'Approving...'
-            : isPending
-            ? 'Submitting...'
-            : isConfirming
-            ? 'Confirming...'
-            : needsApproval
-            ? `Approve ${selectedPool ? (direction === 'buy' ? selectedPool.token1.symbol : selectedPool.token0.symbol) : 'token'}`
-            : 'Place Order'}
+              ? "Approving..."
+              : isPending
+                ? "Submitting..."
+                : isConfirming
+                  ? "Confirming..."
+                  : needsApproval
+                    ? `Approve ${inputTokenSymbol ?? "token"}`
+                    : !selectedToken || !paymentToken
+                      ? "Place Order"
+                      : direction === "buy"
+                        ? `Buy ${selectedToken.symbol}`
+                        : `Sell ${selectedToken.symbol}`}
         </button>
 
         {!address && (

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueries } from "@tanstack/react-query";
 import { TOKENS } from "@/config/tokens";
 import type { Address } from "viem";
 
@@ -100,9 +100,59 @@ export function useCoinbasePrice(symbol?: string) {
 
 /**
  * Hook to fetch multiple token prices by addresses
+ * Uses useQueries to avoid hooks order violation
  * @param tokenAddresses - Array of token contract addresses
  */
 export function useTokenPrices(tokenAddresses: Address[]) {
-  const prices = tokenAddresses.map((addr) => useTokenPrice(addr));
-  return prices;
+  return useQueries({
+    queries: tokenAddresses.map((address) => {
+      // Find token by address (case-insensitive)
+      let token = Object.values(TOKENS).find(
+        (t) => t.address.toLowerCase() === address.toLowerCase(),
+      );
+
+      // Fallback: Try to find by symbol if address doesn't match
+      // This handles cases where pools use different token addresses than our config
+      if (!token) {
+        // Extract symbol from address if possible, or use common mappings
+        const symbol = addressToSymbol(address);
+        if (symbol) {
+          token = Object.values(TOKENS).find(
+            (t) => t.symbol?.toLowerCase() === symbol.toLowerCase(),
+          );
+        }
+      }
+
+      const coinbaseId = token?.coinbaseId;
+
+      return {
+        queryKey: ["coinbase-price", coinbaseId],
+        queryFn: () => fetchCoinbasePriceById(coinbaseId ?? ""),
+        enabled: !!coinbaseId,
+        staleTime: STALE_TIME,
+        gcTime: CACHE_TIME,
+        retry: 2,
+      };
+    }),
+  });
+}
+
+/**
+ * Helper to map common token addresses to symbols
+ * Add known addresses that might differ from TOKENS config
+ */
+function addressToSymbol(address: Address): string {
+  // Known address -> symbol mappings for SKALE testnet
+  const addressMap: Record<string, string> = {
+    // Add any known WBTC, WETH, etc. addresses here
+    // e.g., "0x...": "WBTC",
+  };
+
+  const normalized = address.toLowerCase();
+  if (addressMap[normalized]) {
+    return addressMap[normalized];
+  }
+
+  // Try to detect from common patterns or return empty
+  return "";
 }

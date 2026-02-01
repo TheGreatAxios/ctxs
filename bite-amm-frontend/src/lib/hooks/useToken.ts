@@ -1,4 +1,5 @@
 import { useReadContract, useReadContracts } from "wagmi";
+import { useMemo, useCallback } from "react";
 import type { Address, Abi } from "viem";
 import IERC20ABI from "../../../abi/IERC20.json";
 
@@ -127,29 +128,33 @@ export function useMultipleTokenInfo(tokenAddresses: readonly Address[]) {
     },
   });
 
-  const tokenMap = new Map<Address, TokenInfo>();
+  const tokenMap = useMemo(() => {
+    const map = new Map<Address, TokenInfo>();
 
-  uniqueAddresses.forEach((address, i) => {
-    const symbolResult = results?.[i * 3];
-    const nameResult = results?.[i * 3 + 1];
-    const decimalsResult = results?.[i * 3 + 2];
+    uniqueAddresses.forEach((address, i) => {
+      const symbolResult = results?.[i * 3];
+      const nameResult = results?.[i * 3 + 1];
+      const decimalsResult = results?.[i * 3 + 2];
 
-    if (
-      symbolResult?.status === "success" &&
-      nameResult?.status === "success" &&
-      decimalsResult?.status === "success"
-    ) {
-      tokenMap.set(address, {
-        address,
-        symbol: symbolResult.result as string,
-        name: nameResult.result as string,
-        decimals: decimalsResult.result as number,
-      });
-    }
-  });
+      if (
+        symbolResult?.status === "success" &&
+        nameResult?.status === "success" &&
+        decimalsResult?.status === "success"
+      ) {
+        map.set(address, {
+          address,
+          symbol: symbolResult.result as string,
+          name: nameResult.result as string,
+          decimals: decimalsResult.result as number,
+        });
+      }
+    });
 
-  return {
-    getTokenInfo: (address: Address): TokenInfo | undefined => {
+    return map;
+  }, [results, uniqueAddresses]);
+
+  const getTokenInfo = useCallback(
+    (address: Address): TokenInfo | undefined => {
       if (address === "0x0000000000000000000000000000000000000000") {
         return {
           address,
@@ -160,5 +165,8 @@ export function useMultipleTokenInfo(tokenAddresses: readonly Address[]) {
       }
       return tokenMap.get(address);
     },
-  };
+    [tokenMap],
+  );
+
+  return { getTokenInfo };
 }

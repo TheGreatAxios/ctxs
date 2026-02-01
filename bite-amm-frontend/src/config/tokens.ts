@@ -25,6 +25,18 @@ export const TOKENS: Record<string, TokenInfo> = {
     address: "0x4B0D38a8bC57e78Eb0Afa5eeA1A1DA30072134ab" as `0x${string}`,
     symbol: "WETH",
     decimals: 18,
+    coinbaseId: "weth",
+  },
+  SKL: {
+    address: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+    symbol: "SKL",
+    decimals: 18,
+    coinbaseId: "skale",
+  },
+  ETH: {
+    address: "0x0000000000000000000000000000000000000001" as `0x${string}`,
+    symbol: "ETH",
+    decimals: 18,
     coinbaseId: "ethereum",
   },
 };

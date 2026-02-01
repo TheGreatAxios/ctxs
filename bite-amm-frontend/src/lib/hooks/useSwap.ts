@@ -56,6 +56,7 @@ export function useSwap() {
     writeContract,
     data: writeData,
     error: writeError,
+    isPending: isWritePending,
   } = useWriteContract();
   const { sendTransaction, data: sendTxData, error: sendTxError } = useSendTransaction();
   const publicClient = usePublicClient();
@@ -64,7 +65,7 @@ export function useSwap() {
     hash: activeHash ?? undefined,
   });
 
-  const isPending = activeHash !== null && receipt === undefined;
+  const isPending = isWritePending || (activeHash !== null && receipt === undefined);
 
   // Watch writeData for hash as fallback
   useEffect(() => {
@@ -285,13 +286,13 @@ export function useApprove() {
   const [activeHash, setActiveHash] = useState<`0x${string}` | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { writeContract, data: writeData } = useWriteContract();
+  const { writeContract, data: writeData, isPending: isWritePending } = useWriteContract();
 
   const { data: receipt, isLoading: isConfirming } = useTxReceipt({
     hash: activeHash ?? undefined,
   });
 
-  const isPending = activeHash !== null && receipt === undefined;
+  const isPending = isWritePending || (activeHash !== null && receipt === undefined);
 
   const approve = async (
     tokenAddress: Address,

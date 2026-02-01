@@ -3,10 +3,14 @@ import {
   useReadContracts,
   useSimulateContract,
   useWriteContract,
+  useSendTransaction,
 } from "wagmi";
 import type { Address, Abi } from "viem";
 import { useState } from "react";
 import { useTxReceipt } from "./useTxReceipt";
+import { encodeFunctionData } from "viem";
+import { BITE } from "@skalenetwork/bite";
+import { skaleTestnetChain } from "@/wagmi";
 import BiteSwapV2PairABI from "../../../abi/BiteSwapV2Pair.json";
 import BiteSwapV2FactoryABI from "../../../abi/BiteSwapV2Factory.json";
 
@@ -239,9 +243,10 @@ export function useAddLiquidity() {
   const [isPending, setIsPending] = useState(false);
 
   const { writeContract, data: writeData } = useWriteContract();
+  const { sendTransaction, data: sendTxData } = useSendTransaction();
 
   const { data: receipt, isLoading: isConfirming } = useTxReceipt({
-    hash: writeData,
+    hash: writeData ?? sendTxData,
   });
 
   const addLiquidity = async (
@@ -253,13 +258,14 @@ export function useAddLiquidity() {
     amountAMin: bigint,
     amountBMin: bigint,
     to: Address,
+    useEncryption?: boolean,
   ): Promise<void> => {
     setIsPending(true);
 
     try {
-      writeContract({
-        address: routerAddress,
-        abi: [
+      if (useEncryption) {
+        // === BITE Phase 1: Encrypted Transaction ===
+        const abi = [
           {
             type: "function",
             name: "addLiquidity",
@@ -279,14 +285,66 @@ export function useAddLiquidity() {
               { name: "liquidity", type: "uint256" },
             ],
           },
-        ],
-        functionName: "addLiquidity",
-        args: [tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, to],
-        // SKALE requires explicit gas settings
-        gas: 25_000_000n,
-        maxFeePerGas: 500_000_000n, // 0.5 gwei
-        maxPriorityFeePerGas: 500_000_000n, // 0.5 gwei
-      });
+        ] as const;
+
+        const encodedCalldata = encodeFunctionData({
+          abi,
+          functionName: "addLiquidity",
+          args: [tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, to],
+        });
+
+        const transaction = {
+          to: routerAddress,
+          data: encodedCalldata,
+          value: 0n,
+        };
+
+        const rpcUrl = skaleTestnetChain.rpcUrls.public.http[0];
+        const bite = new BITE(rpcUrl);
+        const encryptedTx = await bite.encryptTransaction(transaction);
+
+        console.log("BITE Phase 1 Encryption for addLiquidity:", {
+          originalTo: routerAddress,
+          magicTo: encryptedTx.to,
+        });
+
+        sendTransaction({
+          to: encryptedTx.to as Address,
+          data: encryptedTx.data as `0x${string}`,
+          gas: 25_000_000n,
+        });
+      } else {
+        // === Standard Transaction ===
+        writeContract({
+          address: routerAddress,
+          abi: [
+            {
+              type: "function",
+              name: "addLiquidity",
+              stateMutability: "nonpayable",
+              inputs: [
+                { name: "tokenA", type: "address" },
+                { name: "tokenB", type: "address" },
+                { name: "amountADesired", type: "uint256" },
+                { name: "amountBDesired", type: "uint256" },
+                { name: "amountAMin", type: "uint256" },
+                { name: "amountBMin", type: "uint256" },
+                { name: "to", type: "address" },
+              ],
+              outputs: [
+                { name: "amountA", type: "uint256" },
+                { name: "amountB", type: "uint256" },
+                { name: "liquidity", type: "uint256" },
+              ],
+            },
+          ],
+          functionName: "addLiquidity",
+          args: [tokenA, tokenB, amountA, amountB, amountAMin, amountBMin, to],
+          gas: 25_000_000n,
+          maxFeePerGas: 500_000_000n,
+          maxPriorityFeePerGas: 500_000_000n,
+        });
+      }
     } finally {
       setIsPending(false);
     }
@@ -297,7 +355,7 @@ export function useAddLiquidity() {
     isPending,
     isConfirming,
     receipt,
-    txHash: writeData,
+    txHash: writeData ?? sendTxData,
   };
 }
 
