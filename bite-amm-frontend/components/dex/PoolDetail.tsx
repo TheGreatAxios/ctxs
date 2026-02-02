@@ -35,6 +35,8 @@ interface PoolDetailProps {
 export function PoolDetail({ pairAddress }: PoolDetailProps) {
   const { address } = useAccount();
   const { data: poolInfo, isLoading } = usePoolInfo(pairAddress);
+  const { data: token0Info } = useTokenInfo(poolInfo?.token0 as `0x${string}` | undefined);
+  const { data: token1Info } = useTokenInfo(poolInfo?.token1 as `0x${string}` | undefined);
 
   const { data: userLpBalance } = useBalance({
     address,
@@ -65,7 +67,7 @@ export function PoolDetail({ pairAddress }: PoolDetailProps) {
   const token1 = poolInfo.token1 as `0x${string}`;
 
   const userShare = userLpBalance
-    ? (Number(userLpBalance.value) / Number(formatUnits(totalSupply, 18))) * 100
+    ? (Number(formatUnits(userLpBalance.value, 18)) / Number(formatUnits(totalSupply, 18))) * 100
     : 0;
 
   const userReserve0 = userLpBalance
@@ -81,7 +83,7 @@ export function PoolDetail({ pairAddress }: PoolDetailProps) {
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-3">
           <h1 className="text-4xl font-black text-stone-900 tracking-tight uppercase">
-            {getTokenSymbol(token0)} / {getTokenSymbol(token1)}
+            {token0Info?.symbol ?? getTokenSymbol(token0)} / {token1Info?.symbol ?? getTokenSymbol(token1)}
           </h1>
           <span className="px-3 py-1 bg-primary text-primary-foreground text-xs font-bold uppercase tracking-widest brutalist-shadow rounded-lg">
             Pool
@@ -92,14 +94,12 @@ export function PoolDetail({ pairAddress }: PoolDetailProps) {
 
       <div className="grid md:grid-cols-2 gap-6">
         <PoolStatsCard
-          title="Pool Reserves"
           reserve0={reserve0}
           reserve1={reserve1}
+          totalSupply={totalSupply}
           token0={token0}
           token1={token1}
         />
-
-        <PoolStatsCard title="Total Supply" totalSupply={totalSupply} />
 
         <div className="md:col-span-2">
           <UserPositionCard
@@ -155,14 +155,12 @@ export function PoolDetail({ pairAddress }: PoolDetailProps) {
 }
 
 function PoolStatsCard({
-  title,
   reserve0,
   reserve1,
+  totalSupply,
   token0,
   token1,
-  totalSupply,
 }: {
-  title: string;
   reserve0?: bigint;
   reserve1?: bigint;
   token0?: `0x${string}`;
@@ -172,7 +170,7 @@ function PoolStatsCard({
   return (
     <div className="bg-white border-2 border-black brutalist-shadow rounded-xl p-6">
       <h2 className="text-lg font-black text-stone-900 mb-5 uppercase tracking-widest">
-        {title}
+        Pool Stats
       </h2>
       <div className="space-y-4">
         {reserve0 !== undefined && token0 && (

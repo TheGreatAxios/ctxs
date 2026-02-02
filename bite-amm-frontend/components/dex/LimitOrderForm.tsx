@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useAccount, useBalance, useReadContracts } from "wagmi";
 import type { Address } from "viem";
 import {
@@ -17,7 +17,6 @@ import {
   type LimitOrderParams,
 } from "@/lib/hooks/useLimitOrders";
 import { useApprove } from "@/lib/hooks/useSwap";
-import { useLocalOrders } from "@/lib/hooks/useLocalOrders";
 import { useTokenAllowance } from "@/lib/hooks/useContractRead";
 import {
   useAllPairsLength,
@@ -50,8 +49,7 @@ export function LimitOrderForm() {
   const contracts = chain ? getContractForChain(chain.id) : null;
   const factoryAddress = contracts?.factory;
 
-  const { addOrder } = useLocalOrders(address, chainId ?? TARGET_CHAIN_ID);
-  const { createOrder, isEncrypting, isPending, isConfirming, receipt } =
+  const { createOrder, isEncrypting, isPending, isConfirming } =
     useCreateLimitOrder();
   const { approve, isPending: isApproving } = useApprove();
 
@@ -250,57 +248,6 @@ export function LimitOrderForm() {
     await approve(inputToken, paymentToken.address, amountBigInt);
   };
 
-  // Store order details temporarily until receipt confirms
-  const [pendingOrder, setPendingOrder] = useState<{
-    params: LimitOrderParams;
-    targetPrice: string;
-    amount: string;
-  } | null>(null);
-
-  // Watch for receipt and add order only on success
-  useEffect(() => {
-    if (!receipt || !pendingOrder || !address) return;
-
-    if (receipt.status === "success") {
-      // Extract orderId from OrderCreated event logs
-      const orderCreatedEvent = receipt.logs.find((log) => {
-        return (
-          log.address.toLowerCase() === contracts?.limitOrderBook?.toLowerCase()
-        );
-      });
-
-      // Try to decode the OrderCreated event to get orderId
-      let orderId = BigInt(0);
-      if (orderCreatedEvent) {
-        // The OrderCreated event has signature: OrderCreated(indexed address, indexed address, uint256, uint256, bool, uint256)
-        // For now, we use a hash-based ID since we can't easily decode without the full ABI
-        orderId = BigInt(receipt.blockNumber);
-      }
-
-      addOrder({
-        orderId,
-        pool: pendingOrder.params.pool,
-        targetPrice: pendingOrder.targetPrice,
-        amount: pendingOrder.amount,
-        direction: pendingOrder.params.direction,
-        deadline: pendingOrder.params.deadline,
-        status: "open",
-        createdAt: new Date(),
-        userAddress: address,
-        chainId: chainId ?? TARGET_CHAIN_ID,
-        txHash: receipt.transactionHash,
-      });
-
-      // Clear form and pending order on success
-      setAmount("");
-      setTargetPrice("");
-      setPendingOrder(null);
-    } else if (receipt.status === "reverted") {
-      // Clear pending order on failure
-      setPendingOrder(null);
-    }
-  }, [receipt, pendingOrder, address, contracts, addOrder, chainId]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!address || !paymentToken) return;
@@ -334,17 +281,13 @@ export function LimitOrderForm() {
     }
 
     try {
-      // Store pending order details - will be added to local orders only on successful receipt
-      setPendingOrder({
-        params,
-        targetPrice,
-        amount,
-      });
-
       await createOrder(params, rpcUrl, contracts.limitOrderBook, estimatedGas);
+
+      // Clear form on successful submission
+      setAmount("");
+      setTargetPrice("");
     } catch (error) {
       console.error("Failed to create order:", error);
-      setPendingOrder(null);
     }
   };
 

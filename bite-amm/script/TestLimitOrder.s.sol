@@ -23,9 +23,9 @@ interface ILob {
 
 contract TestLimitOrder is Script {
     // Deployed addresses on SKALE testnet
-    address constant FACTORY = 0x40D2A813fCBE548CF2636748e7B2e39FEfBd2cF9;
-    address constant LOB = 0x5552f3e652dB7479f9a9F7dC94fC209c6F1660Bb;
-    address constant POOL = 0x4bF9696193bCd1D01BDA562bC4390e8EE10F3DEf; // WETH/USDC
+    address constant FACTORY = 0xCA83B453B27470523Dc18Ec9fB545bCB07Bd406b;
+    address constant LOB = 0xdDc9f2bDaD0460D38Fb1330e956A17eFD829b4eA;
+    address constant POOL = 0xF4FF9d2A6c0fe0E343fb8bb47199F73Bc076378D; // USDC/WETH
 
     function run() external {
         address deployer = msg.sender; // Uses --sender address
@@ -91,20 +91,40 @@ contract TestLimitOrder is Script {
             return;
         }
 
-        // Mock encrypted data (in production, use bite.encryptMessage())
-        bytes memory encryptedPrice = abi.encode(3000 * 10 ** 18);
-        bytes memory encryptedAmount = abi.encode(1 * 10 ** 18);
+        // =================================================================
+        // REALISTIC ORDER FOR CURRENT POOL RESERVES
+        // =================================================================
+        // Current reserves: ~26,000 WETH / ~51,949,093 USDC
+        // Price: ~1,998 USDC per WETH
+        //
+        // ORDER: Swap 1000 USDC -> WETH
+        // - Input amount: 1000 USDC (1000 * 10^6)
+        // - Expected output: ~0.49 WETH at current price
+        // - Target output: 0.47 WETH (slightly below market to ensure fill)
+        //
+        // Direction: true = token0 -> token1
+        // token0 = WETH, token1 = USDC
+        // So direction=true means WETH -> USDC
+        //
+        // For USDC -> WETH, we need direction = false
+        // =================================================================
 
-        console.log("\nSubmitting limit order...");
-        console.log("Value: 0.01 ETH");
+        bytes memory encryptedPrice = abi.encode(0.47 * 10 ** 18);   // Target: 0.47 WETH out
+        bytes memory encryptedAmount = abi.encode(1000 * 10 ** 6);    // Input: 1000 USDC
 
-        // Submit limit order
+        console.log("\nSubmitting LIMIT ORDER:");
+        console.log("Input: 1000 USDC");
+        console.log("Target output: 0.47 WETH");
+        console.log("Direction: USDC -> WETH (false)");
+        console.log("Value: 0.01 ETH for gas");
+
+        // Submit limit order (USDC -> WETH, so direction = false since token0=WETH)
         try ILob(LOB).submitLimitOrder{value: 0.01 ether}(
             POOL,
             encryptedPrice,
             encryptedAmount,
-            true, // token0 -> token1
-            0,    // no deadline
+            false, // token1 -> token0 (USDC -> WETH)
+            0,     // no deadline
             signature
         ) returns (uint256 orderId) {
             console.log("\nSUCCESS! Order ID:", orderId);

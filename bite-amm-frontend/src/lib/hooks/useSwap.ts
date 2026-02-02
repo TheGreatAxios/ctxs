@@ -34,8 +34,7 @@ export function calculateAmountOut(
 
 export interface SwapParams {
   routerAddress: Address;
-  tokenIn: Address;
-  tokenOut: Address;
+  path: Address[];
   amountIn: bigint;
   amountOutMin: bigint;
   recipient: Address;
@@ -141,9 +140,6 @@ export function useSwap() {
   const swap = async (params: SwapParams): Promise<void> => {
     if (!address) throw new Error("No address connected");
 
-    // Build token path
-    const path = [params.tokenIn, params.tokenOut];
-
     // Clear previous errors and hash
     setError(null);
     setActiveRouter(params.routerAddress);
@@ -157,7 +153,7 @@ export function useSwap() {
         const encodedCalldata = encodeFunctionData({
           abi: ROUTER_ABI,
           functionName: "swapExactTokensForTokens",
-          args: [params.amountIn, params.amountOutMin, path, params.recipient],
+          args: [params.amountIn, params.amountOutMin, params.path, params.recipient],
         });
 
         // Create transaction object for BITE encryption
@@ -200,7 +196,7 @@ export function useSwap() {
             address: params.routerAddress,
             abi: ROUTER_ABI,
             functionName: "swapExactTokensForTokens",
-            args: [params.amountIn, params.amountOutMin, path, params.recipient],
+            args: [params.amountIn, params.amountOutMin, params.path, params.recipient],
             gas: 25_000_000n,
             maxFeePerGas: 500_000_000n,
             maxPriorityFeePerGas: 500_000_000n,

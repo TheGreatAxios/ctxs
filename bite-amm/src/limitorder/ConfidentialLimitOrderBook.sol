@@ -227,10 +227,11 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
             encryptedArgs[0] = order.encryptedTargetPrice;
             encryptedArgs[1] = order.encryptedAmount;
 
-            bytes[] memory plaintextArgs = new bytes[](3);
+            bytes[] memory plaintextArgs = new bytes[](4);
             plaintextArgs[0] = abi.encode(pool);
             plaintextArgs[1] = abi.encode(order.direction);
-            plaintextArgs[2] = abi.encodePacked(order.maker, order.nonce); // Stable ID
+            plaintextArgs[2] = abi.encode(order.maker);
+            plaintextArgs[3] = abi.encode(order.nonce);
 
             address ctxSender = BITEPrecompile.submitCTX(encryptedArgs, plaintextArgs);
 
