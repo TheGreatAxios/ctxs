@@ -3,9 +3,10 @@ import {
   useWriteContract,
   useReadContract,
   useReadContracts,
+  useSignMessage,
 } from "wagmi";
 import type { Address } from "viem";
-import { toBytes, toHex } from "viem";
+import { toBytes, toHex, keccak256, encodeAbiParameters, parseAbiParameters } from "viem";
 import { useState, useEffect, useMemo } from "react";
 import { encryptTE } from "../bite/encryption";
 import { useTxReceipt } from "./useTxReceipt";
@@ -42,8 +43,10 @@ export function useCreateLimitOrder() {
   const [activeHash, setActiveHash] = useState<`0x${string}` | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isEncrypting, setIsEncrypting] = useState(false);
+  const [isSigning, setIsSigning] = useState(false);
 
   const { writeContract, data: writeData } = useWriteContract();
+  const { signMessageAsync } = useSignMessage();
 
   const { data: receipt, isLoading: isConfirming } = useTxReceipt({
     hash: activeHash ?? undefined,
@@ -65,6 +68,7 @@ export function useCreateLimitOrder() {
     gasDepositAmount?: bigint,
   ): Promise<CreateOrderResult> => {
     setIsEncrypting(true);
+    setIsSigning(true);
     setError(null);
 
     try {
@@ -75,6 +79,26 @@ export function useCreateLimitOrder() {
       ]);
 
       setIsEncrypting(false);
+
+      // Create message to sign: EIP-712 structured data hash
+      // This matches the contract's orderHash = keccak256(abi.encode(pool, msg.sender, nonce))
+      // But since nonce is generated in-contract, we sign what we know
+      const messageHash = keccak256(
+        encodeAbiParameters(
+          parseAbiParameters('address, bool, uint256, bytes, bytes'),
+          [params.pool, params.direction, params.deadline, encryptedTargetPrice, encryptedAmount]
+        )
+      );
+
+      // Sign the message hash
+      const signature = await signMessageAsync({ message: { raw: messageHash } });
+
+      // Convert signature to compact 65-byte format (v + r + s)
+      // wagmi signs with eth_signTypedData_v4 which returns 65 bytes already
+      // But we need to ensure it's in the correct format: r(32) + s(32) + v(1)
+      const signatureBytes = toBytes(signature as `0x${string}`);
+
+      setIsSigning(false);
 
       // Submit the limit order transaction
       writeContract(
@@ -88,6 +112,7 @@ export function useCreateLimitOrder() {
             encryptedAmount,
             params.direction,
             params.deadline,
+            signature as `0x${string}`, // 65-byte signature
           ],
           value: gasDepositAmount ?? BigInt(0),
         },
@@ -111,6 +136,7 @@ export function useCreateLimitOrder() {
       };
     } catch (err) {
       setIsEncrypting(false);
+      setIsSigning(false);
       const message =
         err instanceof Error ? err.message : "Failed to create order";
       setError(message);
@@ -135,6 +161,7 @@ export function useCreateLimitOrder() {
     createOrder,
     isPending,
     isEncrypting,
+    isSigning,
     isConfirming,
     receipt,
     txHash: activeHash,

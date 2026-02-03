@@ -49,7 +49,7 @@ export function LimitOrderForm() {
   const contracts = chain ? getContractForChain(chain.id) : null;
   const factoryAddress = contracts?.factory;
 
-  const { createOrder, isEncrypting, isPending, isConfirming } =
+  const { createOrder, isEncrypting, isSigning, isPending, isConfirming } =
     useCreateLimitOrder();
   const { approve, isPending: isApproving } = useApprove();
 
@@ -161,14 +161,16 @@ export function LimitOrderForm() {
       .sort((a, b) => b.liquidityUsd - a.liquidityUsd);
   }, [poolsData, getTokenInfo, tokenBalances, tokenPriceMap]);
 
-  // Build token -> pools mapping
+  // Build token -> pools mapping (normalize addresses to lowercase)
   const tokenToPoolsMap = useMemo(() => {
-    const map = new Map<Address, Pool[]>();
+    const map = new Map<string, Pool[]>();
     poolsWithLiquidity.forEach((pool) => {
-      if (!map.has(pool.token0.address)) map.set(pool.token0.address, []);
-      if (!map.has(pool.token1.address)) map.set(pool.token1.address, []);
-      map.get(pool.token0.address)!.push(pool);
-      map.get(pool.token1.address)!.push(pool);
+      const token0Addr = pool.token0.address.toLowerCase();
+      const token1Addr = pool.token1.address.toLowerCase();
+      if (!map.has(token0Addr)) map.set(token0Addr, []);
+      if (!map.has(token1Addr)) map.set(token1Addr, []);
+      map.get(token0Addr)!.push(pool);
+      map.get(token1Addr)!.push(pool);
     });
     return map;
   }, [poolsWithLiquidity]);
@@ -176,7 +178,7 @@ export function LimitOrderForm() {
   // Available tokens for selection
   const availableTokens = useMemo(() => {
     const tokenAddresses = Array.from(tokenToPoolsMap.keys());
-    return AVAILABLE_TOKENS.filter((t) => tokenAddresses.includes(t.address));
+    return AVAILABLE_TOKENS.filter((t) => tokenAddresses.includes(t.address.toLowerCase()));
   }, [tokenToPoolsMap]);
 
   const [selectedToken, setSelectedToken] = useState<TokenInfo | null>(null);
@@ -190,7 +192,7 @@ export function LimitOrderForm() {
   // Get available pools for selected token (pools we can use to trade this token)
   const availablePools = useMemo(() => {
     if (!selectedToken) return [];
-    return tokenToPoolsMap.get(selectedToken.address) ?? [];
+    return tokenToPoolsMap.get(selectedToken.address.toLowerCase()) ?? [];
   }, [selectedToken, tokenToPoolsMap]);
 
   // Get the "other" token in the selected pool (what we're paying with)
@@ -562,6 +564,7 @@ export function LimitOrderForm() {
             !address ||
             !paymentToken ||
             isEncrypting ||
+            isSigning ||
             isPending ||
             isConfirming ||
             isApproving
@@ -572,24 +575,26 @@ export function LimitOrderForm() {
               : "bg-accent hover:bg-accent/90 text-accent-foreground"
           } disabled:bg-stone-300 disabled:cursor-not-allowed font-black rounded-lg px-3 py-3 brutalist-shadow transition-all hover:translate-y-1 hover:shadow-[2px_2px_0_0_#000] active:shadow-none active:translate-y-2 uppercase tracking-widest flex items-center justify-center gap-2 text-sm flex-shrink-0`}
         >
-          {(isEncrypting || isPending || isConfirming || isApproving) && (
+          {(isEncrypting || isSigning || isPending || isConfirming || isApproving) && (
             <Loader2 className="w-4 h-4 animate-spin" />
           )}
           {isEncrypting
             ? "Encrypting..."
-            : isApproving
-              ? "Approving..."
-              : isPending
-                ? "Submitting..."
-                : isConfirming
-                  ? "Confirming..."
-                  : needsApproval
-                    ? `Approve ${inputTokenSymbol ?? "token"}`
-                    : !selectedToken || !paymentToken
-                      ? "Place Order"
-                      : direction === "buy"
-                        ? `Buy ${selectedToken.symbol}`
-                        : `Sell ${selectedToken.symbol}`}
+            : isSigning
+              ? "Signing..."
+              : isApproving
+                ? "Approving..."
+                : isPending
+                  ? "Submitting..."
+                  : isConfirming
+                    ? "Confirming..."
+                    : needsApproval
+                      ? `Approve ${inputTokenSymbol ?? "token"}`
+                      : !selectedToken || !paymentToken
+                        ? "Place Order"
+                        : direction === "buy"
+                          ? `Buy ${selectedToken.symbol}`
+                          : `Sell ${selectedToken.symbol}`}
         </button>
 
         {!address && (

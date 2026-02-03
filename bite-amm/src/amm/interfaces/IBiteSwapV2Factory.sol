@@ -20,4 +20,13 @@ interface IBiteSwapV2Factory {
     /// @notice Set the limit order book address
     /// @param _limitOrderBook Address of the limit order book
     function setLimitOrderBook(address _limitOrderBook) external;
+
+    /// @notice Get the number of pairs created
+    /// @return Number of pairs
+    function allPairsLength() external view returns (uint256);
+
+    /// @notice Get a pair by index
+    /// @param index Index in allPairs array
+    /// @return Pair address
+    function allPairs(uint256 index) external view returns (address);
 }
