@@ -83,11 +83,7 @@ contract CalculateTriggerAmount is Script {
     }
 
     // x*y=k formula with 0.3% fee
-    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut)
-        internal
-        pure
-        returns (uint256)
-    {
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) internal pure returns (uint256) {
         if (amountIn == 0) return 0;
         if (reserveIn == 0 || reserveOut == 0) return 0;
 

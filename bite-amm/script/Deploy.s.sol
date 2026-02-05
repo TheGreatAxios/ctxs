@@ -9,7 +9,10 @@ import "../src/MockToken.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract DeployScript is Script {
-    function run() external returns (address factory, address router, address lob, address usdc, address usdt, address weth, address wbtc) {
+    function run()
+        external
+        returns (address factory, address router, address lob, address usdc, address usdt, address weth, address wbtc)
+    {
         vm.startBroadcast();
 
         // Deploy tokens

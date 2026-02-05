@@ -69,9 +69,7 @@ contract CreatePairs is Script {
 
     function _mintIfPossible(address token, address to, uint256 amount) internal {
         // Try to call mint if it's a MockToken
-        (bool success, ) = token.call(
-            abi.encodeWithSignature("mint(address,uint256)", to, amount)
-        );
+        (bool success,) = token.call(abi.encodeWithSignature("mint(address,uint256)", to, amount));
         if (success) {
             console.log("Minted to deployer:");
             console.logAddress(token);
@@ -81,12 +79,10 @@ contract CreatePairs is Script {
         }
     }
 
-    function _addLiquidity(
-        address tokenA,
-        address tokenB,
-        uint256 amountA,
-        uint256 amountB
-    ) internal returns (address pair, uint256 liquidity) {
+    function _addLiquidity(address tokenA, address tokenB, uint256 amountA, uint256 amountB)
+        internal
+        returns (address pair, uint256 liquidity)
+    {
         // Check if pair exists
         pair = IBiteSwapV2Factory(FACTORY).getPair(tokenA, tokenB);
 
@@ -101,15 +97,7 @@ contract CreatePairs is Script {
         }
 
         // Add liquidity
-        (, , liquidity) = IBiteSwapV2Router(ROUTER).addLiquidity(
-            tokenA,
-            tokenB,
-            amountA,
-            amountB,
-            0,
-            0,
-            msg.sender
-        );
+        (,, liquidity) = IBiteSwapV2Router(ROUTER).addLiquidity(tokenA, tokenB, amountA, amountB, 0, 0, msg.sender);
 
         console.log("Added liquidity:");
         console.logAddress(tokenA);

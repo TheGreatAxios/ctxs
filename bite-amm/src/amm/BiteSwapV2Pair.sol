@@ -307,7 +307,6 @@ contract BiteSwapV2Pair is IBiteSwapV2Pair, ERC20, ReentrancyGuard {
 
         _update(balance0 + amount0In, balance1 + amount1In);
         _emitLimitOrderEvents(signer, amount0In, amount1In, amount0Out, amount1Out, to);
-        _checkLimitOrders();
     }
 
     /// @notice Emit events for limit order fill (separate to reduce stack depth)

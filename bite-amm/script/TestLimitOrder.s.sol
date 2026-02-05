@@ -109,8 +109,8 @@ contract TestLimitOrder is Script {
         // For USDC -> WETH, we need direction = false
         // =================================================================
 
-        bytes memory encryptedPrice = abi.encode(0.47 * 10 ** 18);   // Target: 0.47 WETH out
-        bytes memory encryptedAmount = abi.encode(1000 * 10 ** 6);    // Input: 1000 USDC
+        bytes memory encryptedPrice = abi.encode(0.47 * 10 ** 18); // Target: 0.47 WETH out
+        bytes memory encryptedAmount = abi.encode(1000 * 10 ** 6); // Input: 1000 USDC
 
         console.log("\nSubmitting LIMIT ORDER:");
         console.log("Input: 1000 USDC");
@@ -124,12 +124,13 @@ contract TestLimitOrder is Script {
             encryptedPrice,
             encryptedAmount,
             false, // token1 -> token0 (USDC -> WETH)
-            0,     // no deadline
+            0, // no deadline
             signature
-        ) returns (uint256 orderId) {
+        ) returns (
+            uint256 orderId
+        ) {
             console.log("\nSUCCESS! Order ID:", orderId);
             _logOrderDetails(orderId, deployer);
-
         } catch Error(string memory reason) {
             console.log("\nFAILED with error:", reason);
         } catch (bytes memory lowLevelData) {

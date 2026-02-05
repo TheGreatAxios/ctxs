@@ -29,12 +29,13 @@ contract TriggerSwap is Script {
         console.log("Triggering swap to check orders...");
         console.log("Swapping 10 USDC -> WETH");
 
-        uint256 amountOut = IBiteSwapV2Router(ROUTER).swapExactTokensForTokens(
-            amountIn,
-            0, // accept any
-            path,
-            msg.sender
-        );
+        uint256 amountOut = IBiteSwapV2Router(ROUTER)
+            .swapExactTokensForTokens(
+                amountIn,
+                0, // accept any
+                path,
+                msg.sender
+            );
 
         console.log("Received:", amountOut, "wei WETH");
 

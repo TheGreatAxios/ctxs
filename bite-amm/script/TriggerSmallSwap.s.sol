@@ -28,7 +28,7 @@ contract TriggerSmallSwap is Script {
 
         console.log("\n=== Small Swap: 50 USDC -> WBTC ===");
         console.log("Expected output (WBTC):");
-        console.logUint(amountOut / 10**8);
+        console.logUint(amountOut / 10 ** 8);
 
         // Check allowance
         uint256 allowance = IERC20(USDC).allowance(msg.sender, POOL);
@@ -37,7 +37,9 @@ contract TriggerSmallSwap is Script {
 
         if (allowance < amountIn) {
             console.log("\nERROR: Need approval!");
-            console.log("Run: cast send [USDC] \"approve(address,uint256)\" [POOL] type(uint256).max --rpc-url skale_testnet --account bite-deployer --legacy");
+            console.log(
+                "Run: cast send [USDC] \"approve(address,uint256)\" [POOL] type(uint256).max --rpc-url skale_testnet --account bite-deployer --legacy"
+            );
             return;
         }
 

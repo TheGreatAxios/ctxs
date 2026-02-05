@@ -45,8 +45,8 @@ contract TestLimitOrderWBTC is Script {
         // For USDC -> WBTC, need to know direction
         // If token0=WBTC, token1=USDC, then USDC->WBTC = false (token1->token0)
 
-        bytes memory encryptedPrice = abi.encode(0.0045 * 10 ** 8);   // Target: 0.0045 WBTC (8 decimals)
-        bytes memory encryptedAmount = abi.encode(100 * 10 ** 6);     // Input: 100 USDC
+        bytes memory encryptedPrice = abi.encode(0.0045 * 10 ** 8); // Target: 0.0045 WBTC (8 decimals)
+        bytes memory encryptedAmount = abi.encode(100 * 10 ** 6); // Input: 100 USDC
 
         console.log("\nOrder: 100 USDC -> 0.0045 WBTC");
         console.log("Value: 0.01 ETH for gas");
@@ -58,12 +58,13 @@ contract TestLimitOrderWBTC is Script {
             false, // USDC -> WBTC (token1 -> token0)
             0,
             signature
-        ) returns (uint256 orderId) {
+        ) returns (
+            uint256 orderId
+        ) {
             console.log("\nSUCCESS! Order ID:", orderId);
 
             uint256 newCount = ILob(LOB).getOrderCount(POOL);
             console.log("Total orders:", newCount);
-
         } catch Error(string memory reason) {
             console.log("\nFAILED:", reason);
         } catch (bytes memory lowLevelData) {

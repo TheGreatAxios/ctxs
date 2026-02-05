@@ -55,6 +55,7 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     event OrderFilled(address indexed maker, address indexed pool, uint256 orderId, uint256 amountOut);
     event SwapFailed(address indexed maker, address indexed pool, uint256 indexed orderId, bytes reason);
     event CTXSubmitted(address indexed pool, uint256 orderId, address ctxSender);
+    event BatchCTXSubmitted(address indexed pool, uint256 submittedCount);
     event GasDeposited(address indexed user, uint256 amount);
     event GasWithdrawn(address indexed user, uint256 amount);
     event FactorySet(address indexed factory);
@@ -140,7 +141,9 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
                 active: true,
                 gasDeducted: false,
                 orderHash: orderHash,
-                signature: signature
+                signature: signature,
+                ctxProcessing: false,
+                lastProcessedBlock: 0
             })
         );
 
@@ -184,7 +187,7 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
     // ═════════════════════════════════════════════════════════════════════════
     // Order Execution
     // ═════════════════════════════════════════════════════════════════════════
-    /// @notice Check orders after a swap - triggers individual CTX for each active order
+    /// @notice Check orders after a swap - submits batch CTX for all processable orders
     /// @dev Called by BiteSwapV2Pair.swap() via the swap hook
     /// @param pool The AMM pair address
     function checkOrders(address pool) external lockPool(pool) {
@@ -193,61 +196,127 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
         LimitOrderStructs.LimitOrder[] storage orders = poolOrders[pool];
         uint256 ordersLength = orders.length;
 
+        // Collect indices of all processable orders
+        uint256[] memory orderIndices = new uint256[](ordersLength);
+        uint256 validCount = 0;
+
         for (uint256 i = 0; i < ordersLength;) {
-            LimitOrderStructs.LimitOrder storage order = orders[i];
+            if (canProcessOrder(orders[i], pool)) {
+                orderIndices[validCount] = i;
+                ++validCount;
+            }
+            unchecked {
+                ++i;
+            }
+        }
 
-            // Skip inactive orders
-            if (!order.active) {
+        // Submit batch CTX
+        uint256 submitted = submitBatchCTX(pool, orders, orderIndices, validCount);
+
+        emit BatchCTXSubmitted(pool, submitted);
+    }
+
+    /// @notice Submit batch CTX for multiple orders
+    /// @param pool Pool address
+    /// @param orders Orders array
+    /// @param orderIndices Indices of orders to process
+    /// @param indicesCount Number of valid indices
+    /// @return submittedCount Number of CTXs submitted
+    function submitBatchCTX(
+        address pool,
+        LimitOrderStructs.LimitOrder[] storage orders,
+        uint256[] memory orderIndices,
+        uint256 indicesCount
+    ) internal returns (uint256 submittedCount) {
+        if (indicesCount == 0) return 0;
+
+        // Build batch arrays - max size is indicesCount
+        bytes[] memory encryptedArgs = new bytes[](indicesCount * 2);
+        bytes[] memory plaintextArgs = new bytes[](indicesCount * 4);
+        uint256[] memory indicesToProcess = new uint256[](indicesCount);
+
+        uint256 idx = 0;
+        for (uint256 i = 0; i < indicesCount;) {
+            uint256 orderIdx = orderIndices[i];
+            LimitOrderStructs.LimitOrder storage order = orders[orderIdx];
+
+            if (!canProcessOrder(order, pool)) {
                 unchecked {
                     ++i;
                 }
                 continue;
             }
 
-            // Check expiration
-            if (order.deadline != 0 && block.timestamp >= order.deadline) {
-                order.active = false;
-                emit OrderExpired(order.maker, pool, i);
-                unchecked {
-                    ++i;
-                }
-                continue;
+            // Mark as processing
+            markOrderProcessing(order);
+
+            // Encode encrypted data
+            encryptedArgs[idx * 2] = order.encryptedTargetPrice;
+            encryptedArgs[idx * 2 + 1] = order.encryptedAmount;
+
+            // Encode plaintext data
+            plaintextArgs[idx * 4] = abi.encode(order.pool);
+            plaintextArgs[idx * 4 + 1] = abi.encode(order.direction);
+            plaintextArgs[idx * 4 + 2] = abi.encode(order.maker);
+            plaintextArgs[idx * 4 + 3] = abi.encode(order.nonce);
+
+            indicesToProcess[idx] = orderIdx;
+            ++idx;
+            unchecked {
+                ++i;
             }
+        }
 
-            // Check gas balance - skip if insufficient funds
-            uint256 gasCost = CTX_GAS_COST;
-            if (userGasBalance[order.maker] < gasCost) {
-                unchecked {
-                    ++i;
-                }
-                continue;
-            }
+        if (idx == 0) return 0;
 
-            bytes[] memory encryptedArgs = new bytes[](2);
-            encryptedArgs[0] = order.encryptedTargetPrice;
-            encryptedArgs[1] = order.encryptedAmount;
+        // Submit batch CTX with higher gas limit (500k per order + buffer)
+        uint256 batchGasLimit = 500_000 * idx + 100_000;
+        address ctxSender = BITEPrecompile.submitCTX(encryptedArgs, plaintextArgs, batchGasLimit);
 
-            bytes[] memory plaintextArgs = new bytes[](4);
-            plaintextArgs[0] = abi.encode(pool);
-            plaintextArgs[1] = abi.encode(order.direction);
-            plaintextArgs[2] = abi.encode(order.maker);
-            plaintextArgs[3] = abi.encode(order.nonce);
-
-            address ctxSender = BITEPrecompile.submitCTX(encryptedArgs, plaintextArgs, 500_000);
-
-            // Deduct gas only after successful CTX submission
+        // Deduct gas from all users and fund CTX sender
+        uint256 gasCost = CTX_GAS_COST;
+        for (uint256 i = 0; i < idx;) {
+            LimitOrderStructs.LimitOrder storage order = orders[indicesToProcess[i]];
             userGasBalance[order.maker] -= gasCost;
             order.gasDeducted = true;
 
+            // Fund CTX sender
             (bool success,) = payable(ctxSender).call{value: gasCost}("");
             if (!success) {
-                // Refund gas if ETH transfer fails
+                // Refund and revert
                 userGasBalance[order.maker] += gasCost;
                 order.gasDeducted = false;
                 revert TransferFailed();
             }
+            unchecked {
+                ++i;
+            }
+        }
 
-            emit CTXSubmitted(pool, i, ctxSender);
+        return idx;
+    }
+
+    /// @notice BITE V2 callback - called with decrypted batch values
+    /// @dev Only callable by BITE V2 system
+    /// @param decryptedArgs Decrypted values [targetPrice1, amount1, targetPrice2, amount2, ...]
+    /// @param plainArgs Plaintext values [pool1, direction1, maker1, nonce1, pool2, direction2, ...]
+    function onDecrypt(bytes[] calldata decryptedArgs, bytes[] calldata plainArgs) external nonReentrant {
+        uint256 orderCount = decryptedArgs.length / 2; // 2 encrypted values per order
+        if (plainArgs.length != orderCount * 4) revert InvalidOrderData();
+
+        for (uint256 i = 0; i < orderCount;) {
+            // Decode plaintext args
+            address pool = abi.decode(plainArgs[i * 4], (address));
+            bool direction = abi.decode(plainArgs[i * 4 + 1], (bool));
+            address maker = abi.decode(plainArgs[i * 4 + 2], (address));
+            uint256 nonce = abi.decode(plainArgs[i * 4 + 3], (uint256));
+
+            // Decode decrypted args
+            uint256 targetPrice = abi.decode(decryptedArgs[i * 2], (uint256));
+            uint256 amount = abi.decode(decryptedArgs[i * 2 + 1], (uint256));
+
+            // Process order with error handling
+            _processOrderIfValid(pool, maker, nonce, targetPrice, amount, direction);
 
             unchecked {
                 ++i;
@@ -255,59 +324,64 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
         }
     }
 
-    /// @notice BITE V2 callback - called with decrypted values
-    /// @dev Only callable by BITE V2 system
-    /// @param decryptedArgs Decrypted values [targetPrice, amount]
-    /// @param plainArgs Plaintext values [pool, direction, maker, nonce]
-    function onDecrypt(bytes[] calldata decryptedArgs, bytes[] calldata plainArgs) external nonReentrant {
-        if (decryptedArgs.length != 2) revert InvalidOrderData();
-        if (plainArgs.length != 4) revert InvalidOrderData();
-
-        // Decode plaintext args
-        address pool = abi.decode(plainArgs[0], (address));
-        bool direction = abi.decode(plainArgs[1], (bool));
-        address maker = abi.decode(plainArgs[2], (address));
-        uint256 nonce = abi.decode(plainArgs[3], (uint256));
-
+    /// @notice Process a single order from batch CTX
+    /// @param pool Pool address
+    /// @param maker Order maker
+    /// @param nonce Order nonce
+    /// @param targetPrice Decrypted target price
+    /// @param amount Decrypted amount
+    /// @param direction Swap direction
+    /// @return orderFound True if order was found
+    /// @return shouldRetry True if order remains active (condition not met or swap failed)
+    function _processOrderIfValid(
+        address pool,
+        address maker,
+        uint256 nonce,
+        uint256 targetPrice,
+        uint256 amount,
+        bool direction
+    ) internal returns (bool orderFound, bool shouldRetry) {
         // Validate pool
-        if (!_isValidPool(pool)) revert InvalidPool();
+        if (!_isValidPool(pool)) return (false, false);
 
-        // Find order by maker and nonce (stable lookup)
+        // Find order
         LimitOrderStructs.LimitOrder[] storage orders = poolOrders[pool];
         uint256 orderId = _findOrderIndex(orders, maker, nonce);
-        if (orderId == type(uint256).max) revert OrderNotFound();
+        if (orderId == type(uint256).max) return (false, false);
 
         LimitOrderStructs.LimitOrder storage order = orders[orderId];
 
-        // Verify order still active and not expired
-        if (!order.active) revert OrderInactive();
+        // Always clear processing flag (even if inactive or expired)
+        clearOrderProcessing(order);
+
+        // Validate order
+        if (!order.active) return (true, false);
         if (order.deadline != 0 && block.timestamp >= order.deadline) {
             order.active = false;
-            emit OrderExpired(order.maker, pool, orderId);
-            return;
+            emit OrderExpired(maker, pool, orderId);
+            return (true, false);
         }
 
-        // Decode decrypted values
-        uint256 targetPrice = abi.decode(decryptedArgs[0], (uint256));
-        uint256 amount = abi.decode(decryptedArgs[1], (uint256));
-
-        // Check if price condition met
+        // Check price condition (now with decrypted values)
         (bool met, uint256 outputAmount) = _checkPriceCondition(pool, targetPrice, amount, direction);
 
         if (met) {
-            // Attempt swap with safe error handling - use calculated output amount
+            // Execute swap with safe error handling
             (bool success, bytes memory errorData) = _executeSwap(pool, order, outputAmount, direction);
 
             if (success) {
-                // Swap succeeded - mark order as filled
                 order.active = false;
-                emit OrderFilled(order.maker, pool, orderId, outputAmount);
+                emit OrderFilled(maker, pool, orderId, outputAmount);
+                return (true, false); // Order filled, no retry needed
             } else {
-                // Swap failed - order remains active for retry
-                // User can cancel manually or wait for next price check
-                emit SwapFailed(order.maker, pool, orderId, errorData);
+                // Swap failed (slippage, insufficient balance, etc.)
+                emit SwapFailed(maker, pool, orderId, errorData);
+                return (true, true); // Order still active, may retry
             }
         }
+
+        // Condition not met - order remains active for next swap
+        return (true, true); // Order still active, should retry
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -465,6 +539,50 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
             }
         }
         return type(uint256).max;
+    }
+
+    /// @notice Check if order can be processed (pre-flight validation)
+    /// @param order Order to check
+    /// @param pool Pool address for liquidity check
+    /// @return canProcess True if order is eligible for CTX submission
+    function canProcessOrder(LimitOrderStructs.LimitOrder storage order, address pool)
+        internal
+        view
+        returns (bool canProcess)
+    {
+        // Basic status checks
+        if (!order.active) return false;
+        if (order.ctxProcessing) return false; // Already has CTX pending
+        if (order.deadline != 0 && block.timestamp >= order.deadline) return false;
+        if (userGasBalance[order.maker] < CTX_GAS_COST) return false;
+
+        // Pre-CTX check: Verify pool has liquidity for this order direction
+        (uint112 reserve0, uint112 reserve1,) = IBiteSwapV2Pair(pool).getReserves();
+
+        if (order.direction) {
+            // token0 → token1: need reserve1 (output) to have liquidity
+            if (reserve1 == 0) return false;
+            if (reserve0 < 1000) return false; // Need minimum input liquidity
+        } else {
+            // token1 → token0: need reserve0 (output) to have liquidity
+            if (reserve0 == 0) return false;
+            if (reserve1 < 1000) return false; // Need minimum input liquidity
+        }
+
+        return true;
+    }
+
+    /// @notice Mark order as being processed (CTX submitted)
+    /// @param order Order to mark
+    function markOrderProcessing(LimitOrderStructs.LimitOrder storage order) internal {
+        order.ctxProcessing = true;
+        order.lastProcessedBlock = block.number;
+    }
+
+    /// @notice Clear order processing flag (CTX executed or failed)
+    /// @param order Order to clear
+    function clearOrderProcessing(LimitOrderStructs.LimitOrder storage order) internal {
+        order.ctxProcessing = false;
     }
 
     // ═════════════════════════════════════════════════════════════════════════

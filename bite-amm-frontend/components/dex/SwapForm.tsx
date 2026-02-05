@@ -617,7 +617,10 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
       {(calculatedOutput || (fromUsdValue && toUsdValue)) && (
         <div className="bg-stone-100 border-2 border-solid border-black rounded-xl p-4 brutalist-shadow-sm space-y-3">
           {/* Exchange Rate */}
-          {calculatedOutput && fromToken && toToken && cachedAmounts.fromAmount && (
+          {calculatedOutput && fromToken && toToken && cachedAmounts.fromAmount && (() => {
+            const fromAmountBigInt = parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18);
+            return fromAmountBigInt > 0n;
+          })() && (
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-500">
                 Rate

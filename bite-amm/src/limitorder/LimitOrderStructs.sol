@@ -15,6 +15,8 @@ library LimitOrderStructs {
         bool gasDeducted; /// Track if gas was deducted (prevent double-spend on cancel)
         bytes32 orderHash; /// Hash of signed intent for verification
         bytes signature; /// Compact vrs signature for fillLimitOrder authorization
+        bool ctxProcessing; /// CTX submitted, awaiting execution
+        uint256 lastProcessedBlock; /// Track block of last processing
     }
 
     /// @notice Price condition check result

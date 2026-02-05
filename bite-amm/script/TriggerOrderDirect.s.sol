@@ -33,7 +33,9 @@ contract TriggerOrderDirect is Script {
 
         if (currentAllowance < amountIn) {
             console.log("\nERROR: Insufficient allowance!");
-            console.log("Please run: cast send <USDC> \"approve(address,uint256)\" <POOL> 115792089237316195423570985008687907853269984665640564039457584007913129639935 --rpc-url skale_testnet --account bite-deployer --legacy");
+            console.log(
+                "Please run: cast send <USDC> \"approve(address,uint256)\" <POOL> 115792089237316195423570985008687907853269984665640564039457584007913129639935 --rpc-url skale_testnet --account bite-deployer --legacy"
+            );
             return;
         }
 

@@ -11,14 +11,14 @@ contract TestPrecompile is Script {
 
         // Test data
         bytes[] memory encryptedArgs = new bytes[](2);
-        encryptedArgs[0] = abi.encode(12345);  // mock target price
-        encryptedArgs[1] = abi.encode(67890);  // mock amount
+        encryptedArgs[0] = abi.encode(12345); // mock target price
+        encryptedArgs[1] = abi.encode(67890); // mock amount
 
         bytes[] memory plaintextArgs = new bytes[](4);
-        plaintextArgs[0] = abi.encode(address(0x123));  // mock pool
-        plaintextArgs[1] = abi.encode(true);           // mock direction
-        plaintextArgs[2] = abi.encode(msg.sender);      // mock maker
-        plaintextArgs[3] = abi.encode(uint256(1));      // mock nonce
+        plaintextArgs[0] = abi.encode(address(0x123)); // mock pool
+        plaintextArgs[1] = abi.encode(true); // mock direction
+        plaintextArgs[2] = abi.encode(msg.sender); // mock maker
+        plaintextArgs[3] = abi.encode(uint256(1)); // mock nonce
 
         // Build input: just abi.encode(encryptedArgs, plaintextArgs)
         bytes memory input = abi.encode(encryptedArgs, plaintextArgs);

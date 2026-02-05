@@ -40,11 +40,7 @@ contract DebugSwapTx is Script {
         console.log("Output for 3000 USDC (WETH):", wethOutFor3kUsdc / 1e18);
     }
 
-    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut)
-        internal
-        pure
-        returns (uint256)
-    {
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) internal pure returns (uint256) {
         if (amountIn == 0) return 0;
         if (reserveIn == 0 || reserveOut == 0) return 0;
 
