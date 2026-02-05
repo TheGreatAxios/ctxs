@@ -10,6 +10,7 @@ export interface ChainOrder {
   pool: Address;
   maker: Address;
   active: boolean;
+  // Contract direction: true = token0→token1, false = token1→token0
   direction: boolean;
   deadline: bigint;
   nonce: bigint;

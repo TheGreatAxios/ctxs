@@ -5,9 +5,11 @@ import "../src/amm/BiteSwapV2Router.sol";
 import "../src/amm/BiteSwapV2Library.sol";
 
 contract DebugRouter is Script {
-    address constant ROUTER = 0xf698c0c0556888d33d4e43c89e86C062c1FDCA96;
-    address constant USDC = 0xC8EEde488d7152CED970D9e9621D9330b64Cfd24;
-    address constant WETH = 0x4B0D38a8bC57e78Eb0Afa5eeA1A1DA30072134ab;
+    // Deployed addresses (Feb 2025) - checksummed
+    address constant ROUTER = 0xfDcD856d4c3Ee3c27D63a1FCDC0597226DBe91d5;
+    address constant FACTORY = 0x1E6E5070Cc24244fb4ad44Fc2115d9066794Be71;
+    address constant USDC = 0xAf5DA2c52B5DCB3e94F937e424fd132eb92FfeEE;
+    address constant WETH = 0x8F29B307B81b64caf8Ab2DB2559DBa2CeD1DF7Cc;
 
     function run() external view {
         address routerFactory = address(BiteSwapV2Router(ROUTER).factory());

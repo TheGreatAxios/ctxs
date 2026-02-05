@@ -6,9 +6,12 @@ import "../src/amm/interfaces/IBiteSwapV2Pair.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract TriggerSwap is Script {
-    address constant ROUTER = 0xDB8CD65225F6e6C5F15d132296d6e87D7B1F8e33;
-    address constant USDC = 0xC8EEde488d7152CED970D9e9621D9330b64Cfd24;
-    address constant WETH = 0x4B0D38a8bC57e78Eb0Afa5eeA1A1DA30072134ab;
+    // Deployed addresses (Feb 2025) - checksummed
+    address constant ROUTER = 0xfDcD856d4c3Ee3c27D63a1FCDC0597226DBe91d5;
+    address constant USDC = 0xAf5DA2c52B5DCB3e94F937e424fd132eb92FfeEE;
+    address constant USDT = 0xE242b5c5D390b5777437423e9C7B13e56a7dFA59;
+    address constant WETH = 0x8F29B307B81b64caf8Ab2DB2559DBa2CeD1DF7Cc;
+    address constant WBTC = 0x12A04EAa0e41EaDBE1b12693df3ac82cb7b81375;
 
     function run() external {
         vm.startBroadcast();

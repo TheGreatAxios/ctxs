@@ -20,9 +20,10 @@ interface ILob {
 }
 
 contract TestLimitOrderWBTC is Script {
-    address constant FACTORY = 0xCA83B453B27470523Dc18Ec9fB545bCB07Bd406b;
-    address constant LOB = 0xdDc9f2bDaD0460D38Fb1330e956A17eFD829b4eA;
-    address constant POOL = 0x856d16ceDC67FaeD5EbdAD091f769935298F0ecb; // WBTC/USDC
+    // Deployed addresses (Feb 2025) - checksummed
+    address constant FACTORY = 0x1E6E5070Cc24244fb4ad44Fc2115d9066794Be71;
+    address constant LOB = 0x8d413a5e31F311d1f85be177D658cF468325C88c;
+    address constant POOL = 0xE93B97B1022Be5ea1f0e00E2bC33F6BA8E8009c4; // USDC/WBTC
 
     function run() external {
         console.log("=== Submitting WBTC/USDC Limit Order ===");

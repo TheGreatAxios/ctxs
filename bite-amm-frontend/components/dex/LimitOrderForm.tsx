@@ -261,11 +261,19 @@ export function LimitOrderForm() {
       return;
     }
 
+    // Determine correct contract direction based on token position in pair
+    // contract direction=true = token0→token1 (sell token0, get token1)
+    // contract direction=false = token1→token0 (sell token1, get token0)
+    const selectedTokenIsToken0 = selectedToken?.address.toLowerCase() === paymentToken.token0.address.toLowerCase();
+    // If buying selectedToken: need opposite direction (swap other token for selected)
+    // If selling selectedToken: need matching direction (swap selected for other)
+    const contractDirection = (direction === "buy") !== selectedTokenIsToken0;
+
     const params: LimitOrderParams = {
       pool: paymentToken.address,
       targetPrice: priceBigInt,
       amount: amountBigInt,
-      direction: direction === "buy",
+      direction: contractDirection,
       deadline: BigInt(
         Math.floor(Date.now() / 1000) + parseInt(deadline) * 3600,
       ),

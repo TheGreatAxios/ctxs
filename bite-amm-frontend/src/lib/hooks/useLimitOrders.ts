@@ -18,7 +18,9 @@ export interface LimitOrderParams {
   pool: Address;
   targetPrice: bigint;
   amount: bigint;
-  direction: boolean; // true = buy, false = sell
+  // Contract direction: true = token0→token1, false = token1→token0
+  // This is derived from user's buy/sell intent and token position in pair
+  direction: boolean;
   deadline: bigint;
 }
 

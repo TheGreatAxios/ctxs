@@ -30,17 +30,18 @@ interface ChainContractConfig {
   };
 }
 
+// Deployed addresses - Feb 2025 (checksummed)
 const CHAIN_CONTRACTS: Record<number, ChainContractConfig> = {
   2090472038: {
-    limitOrderBook: '0x1a76f24cda1e390257a5c50d007fefcfd6652132' as Address,
-    factory: '0x6ebe89b1d64928e822a7b6b6eace28a7387d279b' as Address,
-    router: '0x4295afa9bc0643c73ce760c9b207e6d808d8d555' as Address,
+    limitOrderBook: '0x8d413a5e31F311d1f85be177D658cF468325C88c' as Address,
+    factory: '0x1E6E5070Cc24244fb4ad44Fc2115d9066794Be71' as Address,
+    router: '0xfDcD856d4c3Ee3c27D63a1FCDC0597226DBe91d5' as Address,
     pairs: {
-      USDC_WETH: '0x403502d5c9b0990c87b966d855f2cdb2ee3bfbf8' as Address,
-      USDC_WBTC: '0xddb69277c3f578715fed84f5904b954b7bfcc52c' as Address,
-      USDT_WETH: '0x024c92c46e70621be3802db3afd802a4530f61cb' as Address,
-      USDT_WBTC: '0x22e9f132b498f329cb188c656301666871a9f9d6' as Address,
-      WETH_WBTC: '0x9aa2cff557fff26083a6aed8e20978695d6e401b' as Address,
+      USDC_WETH: '0x8fEeae69CD6f48F46C07dE1e7bbEb788a01d2978' as Address,
+      USDC_WBTC: '0xE93B97B1022Be5ea1f0e00E2bC33F6BA8E8009c4' as Address,
+      USDT_WETH: '0x0752b5D83E31604EBE369cD6EBa82e0F728De739' as Address,
+      USDT_WBTC: '0xB112D461eC20e5df033E090fe47d653DbdF39273' as Address,
+      WETH_WBTC: '0x5eDFE72563D93A6A150FA5788FAd4F4AEC8F6D92' as Address,
     },
   },
 };

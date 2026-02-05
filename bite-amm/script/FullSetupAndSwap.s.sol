@@ -6,13 +6,16 @@ import "../src/amm/interfaces/IBiteSwapV2Router.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract FullSetupAndSwap is Script {
-    address constant FACTORY = 0xCA83B453B27470523Dc18Ec9fB545bCB07Bd406b;
-    address constant ROUTER = 0xDB8CD65225F6e6C5F15d132296d6e87D7B1F8e33;
+    // Deployed addresses (Feb 2025) - checksummed
+    address constant FACTORY = 0x1E6E5070Cc24244fb4ad44Fc2115d9066794Be71;
+    address constant ROUTER = 0xfDcD856d4c3Ee3c27D63a1FCDC0597226DBe91d5;
+    address constant LIMIT_ORDER_BOOK = 0x8d413a5e31F311d1f85be177D658cF468325C88c;
 
-    address constant USDC = 0xC8EEde488d7152CED970D9e9621D9330b64Cfd24;
-    address constant USDT = 0x7433ddb971F6a29e24bac69E2d86396201A7aa78;
-    address constant WETH = 0x4B0D38a8bC57e78Eb0Afa5eeA1A1DA30072134ab;
-    address constant WBTC = 0x09C6e0Fe49080e10DF7db8A0c8d64660C4d55D86;
+    // Token addresses (deployed MockTokens) - checksummed
+    address constant USDC = 0xAf5DA2c52B5DCB3e94F937e424fd132eb92FfeEE;
+    address constant USDT = 0xE242b5c5D390b5777437423e9C7B13e56a7dFA59;
+    address constant WETH = 0x8F29B307B81b64caf8Ab2DB2559DBa2CeD1DF7Cc;
+    address constant WBTC = 0x12A04EAa0e41EaDBE1b12693df3ac82cb7b81375;
 
     address constant RECIPIENT = 0xC1789D08713C6aBaeF63db72607a95f4A5D14058;
 

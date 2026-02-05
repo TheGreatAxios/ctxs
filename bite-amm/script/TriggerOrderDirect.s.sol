@@ -5,9 +5,10 @@ import "../src/amm/interfaces/IBiteSwapV2Pair.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract TriggerOrderDirect is Script {
-    address constant POOL = 0xF4FF9d2A6c0fe0E343fb8bb47199F73Bc076378D;
-    address constant USDC = 0xC8EEde488d7152CED970D9e9621D9330b64Cfd24;
-    address constant WETH = 0x4B0D38a8bC57e78Eb0Afa5eeA1A1DA30072134ab;
+    // Deployed addresses (Feb 2025) - checksummed
+    address constant POOL = 0x8fEeae69CD6f48F46C07dE1e7bbEb788a01d2978; // USDC/WETH
+    address constant USDC = 0xAf5DA2c52B5DCB3e94F937e424fd132eb92FfeEE;
+    address constant WETH = 0x8F29B307B81b64caf8Ab2DB2559DBa2CeD1DF7Cc;
 
     function run() external {
         // Get pair info BEFORE broadcast (for display only)

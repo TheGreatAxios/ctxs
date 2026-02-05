@@ -10,7 +10,8 @@ export interface LocalOrder {
   pool: Address;
   targetPrice: string; // Encrypted stored, decrypted for display
   amount: string; // Encrypted stored, decrypted for display
-  direction: boolean; // true = buy, false = sell
+  // Contract direction: true = token0→token1, false = token1→token0
+  direction: boolean;
   deadline: bigint;
   status: 'pending' | 'open' | 'filled' | 'cancelled' | 'expired';
   txHash?: string;

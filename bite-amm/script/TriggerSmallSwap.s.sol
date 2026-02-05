@@ -5,9 +5,10 @@ import "../src/amm/interfaces/IBiteSwapV2Pair.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract TriggerSmallSwap is Script {
-    address constant POOL = 0x856d16ceDC67FaeD5EbdAD091f769935298F0ecb; // WBTC/USDC
-    address constant USDC = 0xC8EEde488d7152CED970D9e9621D9330b64Cfd24;
-    address constant WBTC = 0x09C6e0Fe49080e10DF7db8A0c8d64660C4d55D86;
+    // Deployed addresses (Feb 2025) - checksummed
+    address constant POOL = 0xE93B97B1022Be5ea1f0e00E2bC33F6BA8E8009c4; // USDC/WBTC
+    address constant USDC = 0xAf5DA2c52B5DCB3e94F937e424fd132eb92FfeEE;
+    address constant WBTC = 0x12A04EAa0e41EaDBE1b12693df3ac82cb7b81375;
 
     function run() external {
         // Get reserves and calculate swap

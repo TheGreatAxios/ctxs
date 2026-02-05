@@ -7,15 +7,23 @@ import "../src/amm/interfaces/IBiteSwapV2Pair.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract CreatePairs is Script {
-    // Deployed contract addresses from frontend config
-    address constant FACTORY = 0x6ebE89B1d64928e822a7b6b6eACe28A7387d279b;
-    address constant ROUTER = 0x4295afa9bc0643c73ce760C9b207E6D808D8D555;
+    // Deployed contract addresses (Feb 2025) - checksummed
+    address constant FACTORY = 0x1E6E5070Cc24244fb4ad44Fc2115d9066794Be71;
+    address constant ROUTER = 0xfDcD856d4c3Ee3c27D63a1FCDC0597226DBe91d5;
+    address constant LIMIT_ORDER_BOOK = 0x8d413a5e31F311d1f85be177D658cF468325C88c;
 
-    // Token addresses from frontend config
-    address constant USDC = 0xe2ECa2C7162CD8447595f40b5b4684A8Ec7900f9;
-    address constant USDT = 0x5A4A93dC98025A25c4c01A3b7f56161683da4855;
-    address constant WETH = 0x8FE402e969e751296B4D948f20333BDe21D05878;
-    address constant WBTC = 0xaCC40e0CA34844aBA5cC9D861459851BbC399693;
+    // Token addresses (deployed MockTokens) - checksummed
+    address constant USDC = 0xAf5DA2c52B5DCB3e94F937e424fd132eb92FfeEE;
+    address constant USDT = 0xE242b5c5D390b5777437423e9C7B13e56a7dFA59;
+    address constant WETH = 0x8F29B307B81b64caf8Ab2DB2559DBa2CeD1DF7Cc;
+    address constant WBTC = 0x12A04EAa0e41EaDBE1b12693df3ac82cb7b81375;
+
+    // Pairs already created during deployment - checksummed
+    address constant USDC_WETH_PAIR = 0x8fEeae69CD6f48F46C07dE1e7bbEb788a01d2978;
+    address constant USDC_WBTC_PAIR = 0xE93B97B1022Be5ea1f0e00E2bC33F6BA8E8009c4;
+    address constant USDT_WETH_PAIR = 0x0752b5D83E31604EBE369cD6EBa82e0F728De739;
+    address constant USDT_WBTC_PAIR = 0xB112D461eC20e5df033E090fe47d653DbdF39273;
+    address constant WETH_WBTC_PAIR = 0x5eDFE72563D93A6A150FA5788FAd4F4AEC8F6D92;
 
     function run() external {
         vm.startBroadcast();

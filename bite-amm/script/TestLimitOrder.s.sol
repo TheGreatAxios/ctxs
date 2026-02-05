@@ -22,10 +22,10 @@ interface ILob {
 }
 
 contract TestLimitOrder is Script {
-    // Deployed addresses on SKALE testnet
-    address constant FACTORY = 0xCA83B453B27470523Dc18Ec9fB545bCB07Bd406b;
-    address constant LOB = 0xdDc9f2bDaD0460D38Fb1330e956A17eFD829b4eA;
-    address constant POOL = 0xF4FF9d2A6c0fe0E343fb8bb47199F73Bc076378D; // USDC/WETH
+    // Deployed addresses (Feb 2025) - checksummed
+    address constant FACTORY = 0x1E6E5070Cc24244fb4ad44Fc2115d9066794Be71;
+    address constant LOB = 0x8d413a5e31F311d1f85be177D658cF468325C88c;
+    address constant POOL = 0x8fEeae69CD6f48F46C07dE1e7bbEb788a01d2978; // USDC/WETH
 
     function run() external {
         address deployer = msg.sender; // Uses --sender address
