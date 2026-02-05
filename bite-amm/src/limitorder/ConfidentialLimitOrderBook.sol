@@ -233,7 +233,7 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
             plaintextArgs[2] = abi.encode(order.maker);
             plaintextArgs[3] = abi.encode(order.nonce);
 
-            address ctxSender = BITEPrecompile.submitCTX(encryptedArgs, plaintextArgs);
+            address ctxSender = BITEPrecompile.submitCTX(encryptedArgs, plaintextArgs, 500_000);
 
             // Deduct gas only after successful CTX submission
             userGasBalance[order.maker] -= gasCost;
