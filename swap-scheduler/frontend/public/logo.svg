@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <style>
+      .fangs-fill { fill: #2A2420; }
+      .fangs-stroke { stroke: #FFFFFF; stroke-width: 12; stroke-linejoin: round; }
+      .fangs-white { fill: #FFFFFF; }
+      .fangs-black { fill: #2A2420; }
+    </style>
+  </defs>
+
+  <!-- Shadow offset -->
+  <g transform="translate(12, 12)">
+    <!-- Left fang shadow -->
+    <path d="M196,180
+             L160,320
+             L204,320
+             L220,180Z"
+          class="fangs-fill"/>
+    <!-- Right fang shadow -->
+    <path d="M316,180
+             L352,320
+             L308,320
+             L292,180Z"
+          class="fangs-fill"/>
+    <!-- Gum line shadow -->
+    <path d="M140,180
+             C140,180 180,200 256,200
+             C332,200 372,180 372,180"
+          fill="none"
+          stroke="#2A2420"
+          stroke-width="16"
+          stroke-linecap="round"/>
+  </g>
+
+  <!-- Main logo -->
+  <g>
+    <!-- Left fang -->
+    <path d="M184,168
+             L148,308
+             L192,308
+             L208,168Z"
+          class="fangs-fill fangs-stroke"/>
+
+    <!-- Right fang -->
+    <path d="M304,168
+             L340,308
+             L296,308
+             L280,168Z"
+          class="fangs-fill fangs-stroke"/>
+
+    <!-- Gum line - curved smile -->
+    <path d="M128,168
+             C128,168 168,188 244,188
+             C320,188 360,168 360,168"
+          fill="none"
+          stroke="#FFFFFF"
+          stroke-width="14"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+  </g>
+
+  <!-- Fang highlights for depth -->
+  <g>
+    <!-- Left fang highlight -->
+    <path d="M178,180 L164,260"
+          stroke="#FFFFFF"
+          stroke-width="6"
+          stroke-linecap="round"
+          opacity="0.3"/>
+    <!-- Right fang highlight -->
+    <path d="M310,180 L324,260"
+          stroke="#FFFFFF"
+          stroke-width="6"
+          stroke-linecap="round"
+          opacity="0.3"/>
+  </g>
+</svg>

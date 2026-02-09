@@ -1,0 +1,430 @@
+@import "tailwindcss";
+
+:root {
+  /* Light Neo-brutalist Palette */
+  --background: 40 20% 98%;
+  --foreground: 20 14% 8%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 20 14% 8%;
+
+  --border: 20 14% 8%;
+
+  /* Vibrant Primary Colors */
+  --primary: 195 93% 48%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 142 71% 45%;
+  --secondary-foreground: 0 0% 100%;
+
+  --accent: 346 77% 50%;
+  --accent-foreground: 0 0% 100%;
+
+  --muted: 40 20% 92%;
+  --muted-foreground: 20 14% 40%;
+
+  /* Semantic Colors with Vibrant Tones */
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 100%;
+
+  --warning: 43 96% 56%;
+  --warning-foreground: 20 14% 8%;
+
+  --error: 346 77% 50%;
+  --error-foreground: 0 0% 100%;
+
+  --info: 195 93% 48%;
+  --info-foreground: 0 0% 100%;
+
+  /* Brutalist Radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+}
+
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-border: hsl(var(--border));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-error: hsl(var(--error));
+  --color-error-foreground: hsl(var(--error-foreground));
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+
+  --radius-lg: var(--radius-lg);
+  --radius-md: var(--radius-md);
+  --radius-sm: var(--radius-sm);
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: 'rlig' 1, 'calt' 1;
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Neo-brutalist Base Styles */
+.brutalist-shadow {
+  box-shadow: 4px 4px 0px 0px hsl(var(--border));
+  transition: all 0.15s ease;
+}
+
+.brutalist-shadow:hover {
+  box-shadow: 2px 2px 0px 0px hsl(var(--border));
+  transform: translate(2px, 2px);
+}
+
+.brutalist-shadow:active {
+  box-shadow: 0px 0px 0px 0px hsl(var(--border));
+  transform: translate(4px, 4px);
+}
+
+.brutalist-border {
+  border-width: 3px;
+  border-style: solid;
+  border-color: hsl(var(--border));
+}
+
+/* Brutalist Input Focus */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: 4px 4px 0px 0px hsl(var(--primary));
+  border-color: hsl(var(--primary));
+}
+
+/* Brutalist Button Reset */
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* All links should have pointer cursor */
+a {
+  cursor: pointer;
+}
+
+/* Role button should have pointer cursor */
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+/* Common interactive patterns - add pointer cursor */
+[class*="transition-colors"][class*="hover:"]:not(:disabled):not([disabled]):not([aria-disabled="true"]),
+[class*="brutalist-shadow"][class*="hover:"]:not(:disabled):not([disabled]) {
+  cursor: pointer;
+}
+
+/* Disabled/not-allowed cursor */
+button:disabled,
+[disabled],
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+@layer utilities {
+  /* Ensure all clickable elements have pointer cursor */
+  button:not(:disabled),
+  a:not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer !important;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Brutalist Text Styles */
+  .text-brutalist {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .text-brutalist-lg {
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  /* Brutalist Card Pattern */
+  .brutalist-card {
+    border-width: 3px;
+    border-style: solid;
+    border-color: hsl(var(--border));
+    box-shadow: 4px 4px 0px 0px hsl(var(--border));
+    transition: all 0.15s ease;
+    background-color: hsl(var(--card));
+    border-radius: var(--radius-lg);
+  }
+
+  /* Brutalist Section Divider */
+  .brutalist-divider {
+    height: 3px;
+    background-color: hsl(var(--border));
+  }
+
+  /* Marquee/Pattern Background */
+  .pattern-bg {
+    background-image:
+      linear-gradient(45deg, hsl(var(--muted)) 25%, transparent 25%),
+      linear-gradient(-45deg, hsl(var(--muted)) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, hsl(var(--muted)) 75%),
+      linear-gradient(-45deg, transparent 75%, hsl(var(--muted)) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  }
+
+  /* Brutalist Badge */
+  .brutalist-badge {
+    border-width: 2px;
+    border-style: solid;
+    border-color: hsl(var(--border));
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem;
+  }
+
+  /* Brutalist Link */
+  .brutalist-link {
+    position: relative;
+    display: inline-block;
+    text-decoration: none;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .brutalist-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 0.25rem;
+    background-color: hsl(var(--primary));
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.2s ease;
+  }
+
+  .brutalist-link:hover::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  /* Animated Underline for Emphasis */
+  .brutalist-underline {
+    position: relative;
+    display: inline-block;
+  }
+
+  .brutalist-underline::before {
+    content: '';
+    position: absolute;
+    bottom: -0.0625rem;
+    left: 0;
+    right: 0;
+    height: 0.5rem;
+    background-color: hsl(var(--warning));
+    z-index: -1;
+    transform: skewX(-12deg);
+  }
+
+  /* Brutalist Container */
+  .brutalist-container {
+    max-width: 80rem;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .brutalist-container {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .brutalist-container {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+  }
+
+  /* Brutalist Grid Pattern */
+  .brutalist-grid {
+    background-size: 40px 40px;
+    background-image:
+      linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px);
+    opacity: 0.1;
+  }
+
+  /* Brutalist Tooltip */
+  .brutalist-tooltip {
+    border-width: 3px;
+    border-style: solid;
+    border-color: hsl(var(--border));
+    background-color: hsl(var(--card));
+    box-shadow: 4px 4px 0px 0px hsl(var(--border));
+    transition: all 0.15s ease;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Brutalist Tag */
+  .brutalist-tag {
+    display: inline-flex;
+    align-items: center;
+    border-width: 2px;
+    border-style: solid;
+    border-color: hsl(var(--border));
+    padding: 0.25rem 0.75rem;
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    border-radius: var(--radius-sm);
+    background-color: hsl(var(--card));
+  }
+
+  /* Brutalist Status Indicators */
+  .status-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    box-shadow: 0 0 0 3px hsl(var(--background));
+  }
+
+  .status-dot.online {
+    background-color: hsl(var(--success));
+  }
+
+  .status-dot.offline {
+    background-color: hsl(var(--muted-foreground));
+  }
+
+  .status-dot.busy {
+    background-color: hsl(var(--error));
+  }
+
+  /* Brutalist Scrollbar */
+  .brutalist-scrollbar::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  .brutalist-scrollbar::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border: 2px solid hsl(var(--border));
+  }
+
+  .brutalist-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border: 2px solid hsl(var(--border));
+  }
+
+  .brutalist-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--foreground));
+  }
+
+  /* Brutalist Selection */
+  ::selection {
+    background-color: hsl(var(--warning));
+    color: hsl(var(--warning-foreground));
+  }
+}
+
+/* Neo-brutalist Animations */
+@keyframes brutalist-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.brutalist-bounce {
+  animation: brutalist-bounce 0.6s ease-in-out;
+}
+
+@keyframes brutalist-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.brutalist-shake {
+  animation: brutalist-shake 0.4s ease-in-out;
+}
+
+/* Brutalist Loading Spinner */
+.brutalist-spinner {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 3px solid hsl(var(--border));
+  border-top-color: hsl(var(--primary));
+  border-radius: 50%;
+  animation: brutalist-spin 0.8s linear infinite;
+}
+
+@keyframes brutalist-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Brutalist Focus Ring */
+.focus-ring-brutalist:focus-visible {
+  outline: none;
+  box-shadow: 4px 4px 0px 0px hsl(var(--primary));
+}
+
+/* Brutalist Disabled State */
+.brutalist-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Custom Print Styles */
+@media print {
+  .brutalist-shadow,
+  .brutalist-border {
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+}
