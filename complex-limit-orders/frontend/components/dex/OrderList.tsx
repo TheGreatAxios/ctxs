@@ -8,18 +8,7 @@ import { useCancelLimitOrder } from "@/lib/hooks/useLimitOrders";
 import { Badge } from "@/components/ui/Badge";
 import { CONTRACTS } from "@/config/contracts";
 import { skaleCtxChain } from "@/wagmi";
-import { useContracts } from "@/config/contracts";
-
-// All keys lowercase for consistent matching
-// Format: "token0/token1" - token0 is first in pair
-// Must match addresses in contracts.ts
-const POOL_NAMES: Record<string, string> = {
-  "0x723bb841b1d04a587f93822cca6ff6e8efbee3ab": "USDC/WETH",
-  "0x73b5ebcb81c54308cec3c6d74f45bfeebdabe3f3": "USDC/WBTC",
-  "0x4c9f01b7730260f34f8952858bed2336b2bbe3e6": "USDT/WETH",
-  "0xf9730fd1f7abf47b9db2034995f63c310ba66463": "USDT/WBTC",
-  "0x8e915c02e97f454b65a847eb9027ac5e74c982f4": "WETH/WBTC",
-};
+import { getPoolName, useContracts as useConfigContracts } from "@/config";
 
 // Get swap direction display based on pool and contract direction
 // contract direction: true = token0→token1, false = token1→token0
@@ -32,10 +21,6 @@ function getSwapDirection(poolName: string, contractDirection: boolean): { from:
   } else {
     return { from: token1, to: token0 };
   }
-}
-
-function getPoolName(poolAddress: string): string {
-  return POOL_NAMES[poolAddress.toLowerCase()] ?? poolAddress.slice(0, 8);
 }
 
 function getPoolUrl(poolAddress: string): string {
@@ -59,7 +44,7 @@ function formatDeadline(deadline: bigint): string {
 
 export function OrderList() {
   const { address, chainId } = useAccount();
-  const contracts = useContracts();
+  const contracts = useConfigContracts();
   const { orders, isLoading } = useChainOrders(
     address,
     chainId ?? skaleCtxChain.id,

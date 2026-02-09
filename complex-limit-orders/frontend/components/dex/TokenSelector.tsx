@@ -240,37 +240,45 @@ function TokenList({
   onSelect: (token: TokenInfo) => void;
   searchQuery: string;
 }) {
-  // Fetch all balances and prices
-  const tokensWithData = tokens.map((token) => {
-    const { data: balance } = useBalance({
+  // Fetch all balances and prices - hooks must be called at top level in consistent order
+  const balances = tokens.map((token) =>
+    useBalance({
       address: walletAddress as `0x${string}` | undefined,
       token:
         token.address === "0x0000000000000000000000000000000000000000"
           ? undefined
           : token.address,
+    })
+  );
+
+  const prices = tokens.map((token) => useCoinbasePrice(token.coinbaseId));
+
+  // Combine tokens with their balance and price data
+  const tokensWithData = useMemo(() => {
+    return tokens.map((token, index) => {
+      const { data: balance } = balances[index];
+      const { data: usdPrice } = prices[index];
+
+      const balanceFormatted = balance
+        ? formatLargeToken(
+            parseFloat(formatBigInt(balance.value, balance.decimals)),
+          )
+        : "0";
+
+      const usdValue =
+        balance && usdPrice
+          ? parseFloat(formatBigInt(balance.value, balance.decimals)) * usdPrice
+          : 0;
+
+      return {
+        ...token,
+        balance,
+        balanceFormatted,
+        usdPrice,
+        usdValue,
+      };
     });
-
-    const { data: usdPrice } = useCoinbasePrice(token.coinbaseId);
-
-    const balanceFormatted = balance
-      ? formatLargeToken(
-          parseFloat(formatBigInt(balance.value, balance.decimals)),
-        )
-      : "0";
-
-    const usdValue =
-      balance && usdPrice
-        ? parseFloat(formatBigInt(balance.value, balance.decimals)) * usdPrice
-        : 0;
-
-    return {
-      ...token,
-      balance,
-      balanceFormatted,
-      usdPrice,
-      usdValue,
-    };
-  });
+  }, [tokens, balances, prices]);
 
   // Sort by USD value (highest first), unless searching
   const sortedTokens = useMemo(() => {

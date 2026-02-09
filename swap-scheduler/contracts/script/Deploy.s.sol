@@ -48,20 +48,18 @@ contract DeployScript is Script {
         console.log("WETH:", weth);
         console.log("WBTC:", wbtc);
 
-        vm.stopBroadcast();
+        // Create pairs and add liquidity (same broadcast)
+        _createPairs(_factory, usdc, weth, 30_000_000 * 10 ** 6, 10_000 * 10 ** 18);
+        _createPairs(_factory, usdc, wbtc, 30_000_000 * 10 ** 6, 385 * 10 ** 8);
+        _createPairs(_factory, usdt, weth, 30_000_000 * 10 ** 6, 10_000 * 10 ** 18);
+        _createPairs(_factory, usdt, wbtc, 30_000_000 * 10 ** 6, 385 * 10 ** 8);
+        _createPairs(_factory, weth, wbtc, 5_000 * 10 ** 18, 192 * 10 ** 8);
 
-        // Create pairs and add liquidity
-        _createPairs(factory, usdc, weth, 30_000_000 * 10 ** 6, 10_000 * 10 ** 18);
-        _createPairs(factory, usdc, wbtc, 30_000_000 * 10 ** 6, 385 * 10 ** 8);
-        _createPairs(factory, usdt, weth, 30_000_000 * 10 ** 6, 10_000 * 10 ** 18);
-        _createPairs(factory, usdt, wbtc, 30_000_000 * 10 ** 6, 385 * 10 ** 8);
-        _createPairs(factory, weth, wbtc, 5_000 * 10 ** 18, 192 * 10 ** 8);
+        vm.stopBroadcast();
     }
 
-    function _createPairs(address factory, address t0, address t1, uint256 a0, uint256 a1) internal {
-        vm.startBroadcast();
-
-        address pair = IBiteSwapV2Factory(factory).createPair(t0, t1);
+    function _createPairs(IBiteSwapV2Factory factory, address t0, address t1, uint256 a0, uint256 a1) internal {
+        address pair = factory.createPair(t0, t1);
         console.log("Pair:", pair);
 
         IERC20(t0).transfer(pair, a0);
@@ -69,7 +67,5 @@ contract DeployScript is Script {
 
         BiteSwapV2Pair(pair).mint(msg.sender);
         console.log("Liquidity added");
-
-        vm.stopBroadcast();
     }
 }

@@ -33,15 +33,15 @@ interface ChainContractConfig {
 // Deployed addresses - Feb 2025 (checksummed)
 const CHAIN_CONTRACTS: Record<number, ChainContractConfig> = {
   2090472038: {
-    scheduledSwapBook: '0x1a6f3a4154e88b9b08f70c4904fe0adee3af27e4' as Address,
-    factory: '0xafa7aa14d2d9cf519c392cab7058586ce9849be5' as Address,
-    router: '0x01aaedbb03e918a895e52f5d665d68926ae079e7' as Address,
+    scheduledSwapBook: '0x6EB7DdA20486a5ebFa904Ab310f8e7336ca6D803' as Address,
+    factory: '0xEF84a39A2b0a600EA91bB6927DB519f5834ebf36' as Address,
+    router: '0x2dB91801b667ED6Cad305c9882F3bc0D2EDa6b24' as Address,
     pairs: {
-      USDC_WETH: '0x77193ef88148cbac6eb7cc5fda3bdc955bbca7ae' as Address,
-      USDC_WBTC: '0x6daac8d984170edb49cf571f8d320adadf944b1d' as Address,
-      USDT_WETH: '0x4ce885a58e282498cdba7c47997cfca60ed00074' as Address,
-      USDT_WBTC: '0xd74aaa7d21b808189ac23eac00e2913ad9c6bf8b' as Address,
-      WETH_WBTC: '0xd6ebf7d4182277a10f0aa4f813f16ead045d4bd1' as Address,
+      USDC_WETH: '0x983B72Fc406aE36906c59a9EF8c695A720E204e9' as Address,
+      USDC_WBTC: '0x4F27ccB25320192aCa416E8Ab3587db5E66E44e6' as Address,
+      USDT_WETH: '0x1Fc90846f98B4F9c7ee2844acfE7dFF67e8C31e8' as Address,
+      USDT_WBTC: '0xEba32eCc184d7BcfA5B792C2e6688a2999CC31bd' as Address,
+      WETH_WBTC: '0xE1a53F17Bbc434242047FfB4112aCCd6De6D3201' as Address,
     },
   },
 };
@@ -62,8 +62,8 @@ export const CONTRACTS = {
   CTX_GAS_COST,
 } as const;
 
-export const FACTORY_ADDRESS = '0x0000000000000000000000000000000000000000' as Address;
-export const ROUTER_ADDRESS = '0x0000000000000000000000000000000000000000' as Address;
+export const FACTORY_ADDRESS = '0xEF84a39A2b0a600EA91bB6927DB519f5834ebf36' as Address;
+export const ROUTER_ADDRESS = '0x2dB91801b667ED6Cad305c9882F3bc0D2EDa6b24' as Address;
 
 export type ContractAddress = keyof typeof CONTRACTS;
 

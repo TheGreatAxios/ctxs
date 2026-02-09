@@ -4,8 +4,8 @@ import { createContext, useContext, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { TOKENS } from '@/config/tokens';
 
-// CoinGecko free public API (no API key needed)
-const COINGECKO_API = 'https://api.coingecko.com/api/v3';
+// Use Next.js API route to avoid CORS issues
+const API_BASE = '/api';
 
 // Cache time: 60 seconds, stale time: 30 seconds
 const CACHE_TIME = 60_000;
@@ -51,7 +51,7 @@ async function fetchAllTokenPrices(): Promise<Record<string, number>> {
     if (coinIds.length === 0) return {};
 
     const response = await fetch(
-      `${COINGECKO_API}/simple/price?ids=${coinIds.join(',')}&vs_currencies=usd`
+      `${API_BASE}/token-prices?ids=${coinIds.join(',')}`
     );
 
     if (!response.ok) {
