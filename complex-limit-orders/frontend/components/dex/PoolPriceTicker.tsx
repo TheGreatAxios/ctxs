@@ -26,6 +26,9 @@ interface PoolPrice {
   priceDiffPercent: number | null;
   isUndervalued: boolean;
   isOvervalued: boolean;
+  tvlUsd: number;
+  reserve0Display: string;
+  reserve1Display: string;
 }
 
 export function PoolPriceTicker() {
@@ -164,6 +167,28 @@ export function PoolPriceTicker() {
         priceDisplay = `$${priceUsd.toFixed(8)}`;
       }
 
+      // Calculate TVL and format reserves
+      const reserve0Formatted = Number(formatUnits(reserve0, token0Info.decimals));
+      const reserve1Formatted = Number(formatUnits(reserve1, token1Info.decimals));
+
+      let tvlUsd = 0;
+      if (token0UsdPrice && token1UsdPrice) {
+        tvlUsd = (reserve0Formatted * token0UsdPrice) + (reserve1Formatted * token1UsdPrice);
+      } else if (token0UsdPrice) {
+        tvlUsd = reserve0Formatted * token0UsdPrice * 2;
+      } else if (token1UsdPrice) {
+        tvlUsd = reserve1Formatted * token1UsdPrice * 2;
+      }
+
+      const formatReserve = (val: number) => {
+        if (val === 0) return "0";
+        if (val >= 1000000) return (val / 1000000).toFixed(2) + "M";
+        if (val >= 1000) return (val / 1000).toFixed(2) + "K";
+        if (val >= 1) return val.toFixed(2);
+        if (val >= 0.0001) return val.toFixed(4);
+        return val.toFixed(6);
+      };
+
       prices.push({
         address: pool.address,
         token0Symbol: token0Info.symbol,
@@ -177,6 +202,9 @@ export function PoolPriceTicker() {
         priceDiffPercent,
         isUndervalued,
         isOvervalued,
+        tvlUsd,
+        reserve0Display: formatReserve(reserve0Formatted),
+        reserve1Display: formatReserve(reserve1Formatted),
       });
     });
 
@@ -310,22 +338,38 @@ export function PoolPriceTicker() {
                     {pool.priceDisplay}
                   </div>
                 )}
+
+                {/* TVL */}
+                <p className="font-black text-stone-900 text-sm">
+                  {pool.tvlUsd > 0
+                    ? `$${pool.tvlUsd >= 1000
+                        ? (pool.tvlUsd / 1000).toFixed(1) + 'K'
+                        : pool.tvlUsd.toFixed(2)}`
+                    : 'N/A'}
+                </p>
+                <p className="text-[10px] font-semibold text-stone-500">
+                  TVL
+                </p>
+
+                {/* Low liquidity warning */}
+                {pool.tvlUsd > 0 && pool.tvlUsd < 100000 && (
+                  <p className="text-[9px] text-amber-600 font-bold">
+                    ⚠️ Low liquidity
+                  </p>
+                )}
               </div>
 
               <div className="text-right">
-                <p className="font-black text-stone-900 text-lg">
+                {/* Price */}
+                <p className="font-black text-stone-900 text-sm">
                   {pool.priceDisplay}
                 </p>
-                {pool.hasUsdPrice && (
-                  <p className="text-xs font-semibold text-stone-500">
-                    {pool.poolRatio < 0.001
-                      ? pool.poolRatio.toExponential(2)
-                      : pool.poolRatio < 1
-                        ? pool.poolRatio.toFixed(6)
-                        : pool.poolRatio.toFixed(4)}{" "}
-                    {pool.token1Symbol}/{pool.token0Symbol}
-                  </p>
-                )}
+
+                {/* Reserves */}
+                <div className="mt-1 text-[10px] text-stone-600">
+                  <div>{pool.reserve0Display} {pool.token0Symbol}</div>
+                  <div>{pool.reserve1Display} {pool.token1Symbol}</div>
+                </div>
               </div>
             </div>
           </div>

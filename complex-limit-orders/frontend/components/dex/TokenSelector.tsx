@@ -42,6 +42,7 @@ interface TokenSelectorProps {
   label?: string;
   availableTokens?: TokenInfo[];
   chainId?: number;
+  disabledTokenAddress?: `0x${string}` | null;
 }
 
 interface TokenWithBalance extends TokenInfo {
@@ -63,6 +64,7 @@ export function TokenSelector({
   label = "Select token",
   availableTokens = [],
   chainId,
+  disabledTokenAddress,
 }: TokenSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -221,6 +223,7 @@ export function TokenSelector({
             walletAddress={walletAddress}
             onSelect={handleSelect}
             searchQuery={searchQuery}
+            disabledTokenAddress={disabledTokenAddress}
           />
         </div>
       </Dialog>
@@ -234,11 +237,13 @@ function TokenList({
   walletAddress,
   onSelect,
   searchQuery,
+  disabledTokenAddress,
 }: {
   tokens: TokenInfo[];
   walletAddress?: string;
   onSelect: (token: TokenInfo) => void;
   searchQuery: string;
+  disabledTokenAddress?: `0x${string}` | null;
 }) {
   // Fetch all balances and prices - hooks must be called at top level in consistent order
   const balances = tokens.map((token) =>
@@ -306,6 +311,7 @@ function TokenList({
           key={token.address}
           token={token}
           onSelect={() => onSelect(token)}
+          isDisabled={token.address === disabledTokenAddress}
         />
       ))}
     </div>
@@ -348,9 +354,11 @@ function getTokenColor(symbol?: string): string {
 function TokenListItem({
   token,
   onSelect,
+  isDisabled,
 }: {
   token: TokenWithBalance;
   onSelect: () => void;
+  isDisabled?: boolean;
 }) {
   const iconUrl = getTokenIconUrl(token.symbol);
   const bgColor = getTokenColor(token.symbol);
@@ -359,7 +367,13 @@ function TokenListItem({
     <button
       type="button"
       onClick={onSelect}
-      className="flex w-full items-center gap-3 rounded-xl border-2 border-transparent p-3 text-left transition-all hover:border-stone-300 hover:bg-stone-100 active:scale-95"
+      disabled={isDisabled}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left transition-all",
+        isDisabled
+          ? "border-transparent bg-stone-100 opacity-50 cursor-not-allowed"
+          : "border-transparent hover:border-stone-300 hover:bg-stone-100 active:scale-95"
+      )}
     >
       {/* Token Icon */}
       <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 border-black overflow-hidden bg-white">
@@ -392,6 +406,11 @@ function TokenListItem({
           <div className="text-xs font-semibold text-stone-500 font-mono">
             {shortenAddress(token.address)}
           </div>
+          {isDisabled && (
+            <div className="text-[10px] font-bold text-stone-500 uppercase">
+              Already selected
+            </div>
+          )}
         </div>
 
         {/* Balance & USD Value */}

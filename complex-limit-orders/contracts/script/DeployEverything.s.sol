@@ -65,19 +65,28 @@ contract DeployEverything is Script {
         console.log("WBTC:", config.wbtc);
 
         // ═════════════════════════════════════════════════════════════════════════
-        // Phase 2: Mint Tokens to Deployer
+        // Phase 2: Mint Tokens to Deployer and Test Accounts
         // ═════════════════════════════════════════════════════════════════════════
         console.log("\n=== Phase 2: Minting Tokens ===");
 
-        MockToken(config.usdc).mint(msg.sender, 100_000_000 * 10 ** 6);
-        MockToken(config.usdt).mint(msg.sender, 100_000_000 * 10 ** 6);
-        MockToken(config.weth).mint(msg.sender, 1_000_000 * 10 ** 18);
-        MockToken(config.wbtc).mint(msg.sender, 100_000 * 10 ** 8);
+        address[] memory recipients = new address[](4);
+        recipients[0] = msg.sender;
+        recipients[1] = 0x8DfF0b2A3F732c340491C9539998f649cdD36b3A;
+        recipients[2] = 0x2c20Ef3fc0248FCA2DC57bcb202F2CAe504A9A66;
+        recipients[3] = 0xC1789D08713C6aBaeF63db72607a95f4A5D14058; // bite-deployer
 
-        console.log("Minted 100M USDC to", msg.sender);
-        console.log("Minted 100M USDT to", msg.sender);
-        console.log("Minted 1M WETH to", msg.sender);
-        console.log("Minted 100K WBTC to", msg.sender);
+        // Mint to each recipient
+        for (uint256 i = 0; i < recipients.length; i++) {
+            // Increased mint amounts for higher liquidity per pool (80M TVL per pool)
+            MockToken(config.usdc).mint(recipients[i], 200_000_000 * 10 ** 6);  // 200M USDC
+            MockToken(config.usdt).mint(recipients[i], 200_000_000 * 10 ** 6);  // 200M USDT
+            MockToken(config.weth).mint(recipients[i], 80_000 * 10 ** 18);        // 80K WETH (~240M)
+            MockToken(config.wbtc).mint(recipients[i], 2_000 * 10 ** 8);          // 2K WBTC (~200M)
+
+            console.log("Minted tokens to:", recipients[i]);
+        }
+
+        console.log("Minted 200M USDC, 200M USDT, 80K WETH, 2K WBTC to each recipient");
 
         vm.stopBroadcast();
 
@@ -149,11 +158,16 @@ contract DeployEverything is Script {
         console.log("\n=== Phase 6: Creating Pairs and Adding Liquidity ===");
 
         LiquidityConfig[5] memory liquidityConfigs = [
-            LiquidityConfig(config.usdc, config.weth, 30_000_000 * 10 ** 6, 10_000 * 10 ** 18),
-            LiquidityConfig(config.usdc, config.wbtc, 30_000_000 * 10 ** 6, 385 * 10 ** 8),
-            LiquidityConfig(config.usdt, config.weth, 30_000_000 * 10 ** 6, 10_000 * 10 ** 18),
-            LiquidityConfig(config.usdt, config.wbtc, 30_000_000 * 10 ** 6, 385 * 10 ** 8),
-            LiquidityConfig(config.weth, config.wbtc, 5_000 * 10 ** 18, 192 * 10 ** 8)
+            // USDC/WETH: 40M USDC + ~13,333 WETH = ~80M TVL
+            LiquidityConfig(config.usdc, config.weth, 40_000_000 * 10 ** 6, 13_333 * 10 ** 18),
+            // USDC/WBTC: 40M USDC + ~400 WBTC = ~80M TVL
+            LiquidityConfig(config.usdc, config.wbtc, 40_000_000 * 10 ** 6, 400 * 10 ** 8),
+            // USDT/WETH: 40M USDT + ~13,333 WETH = ~80M TVL
+            LiquidityConfig(config.usdt, config.weth, 40_000_000 * 10 ** 6, 13_333 * 10 ** 18),
+            // USDT/WBTC: 40M USDT + ~400 WBTC = ~80M TVL
+            LiquidityConfig(config.usdt, config.wbtc, 40_000_000 * 10 ** 6, 400 * 10 ** 8),
+            // WETH/WBTC: ~20K WETH + ~600 WBTC = ~120M TVL
+            LiquidityConfig(config.weth, config.wbtc, 20_000 * 10 ** 18, 600 * 10 ** 8)
         ];
 
         for (uint256 i = 0; i < liquidityConfigs.length; ++i) {

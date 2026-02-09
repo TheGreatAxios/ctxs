@@ -356,7 +356,7 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
     );
   };
 
-  const hasNoRoute = fromToken && toToken && !isLoadingRoute && !route;
+  const hasNoRoute = fromToken && toToken && amountInForRoute && !isLoadingRoute && !route;
 
   return (
     <div className="flex w-full max-w-md flex-col gap-3 bg-white border-3 border-solid border-black rounded-2xl p-5 brutalist-shadow-lg">
@@ -523,6 +523,7 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
               }}
               label="Select"
               availableTokens={availableTokens}
+              disabledTokenAddress={toToken?.address}
             />
             <div className="relative">
               <Input
@@ -588,6 +589,7 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
               }}
               label="Select"
               availableTokens={availableTokens}
+              disabledTokenAddress={fromToken?.address}
             />
             <div className="relative">
               <Input
