@@ -8,7 +8,8 @@ import { ArrowDownUp, AlertCircle, Settings, Zap, DollarSign, Eye, EyeOff } from
 import { cn, formatBigInt, parseBigInt } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { TokenSelector, TokenInfo } from '@/components/dex/TokenSelector';
+import { TokenSelector } from '@/components/dex/TokenSelector';
+import { type TokenInfo } from '@/context/TokenBalancesContext';
 import { useSwap, useApprove, calculateAmountOut } from '@/lib/hooks/useSwap';
 import { useTokenAllowance, useReserves } from '@/lib/hooks/useContractRead';
 import { useTokenPriceByAddress } from '@/lib/hooks/useTokenPrices';

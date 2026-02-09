@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { useAccount, useBalance } from "wagmi";
 import { Search, ChevronDown } from "lucide-react";
-import { cn, shortenAddress, formatBigInt } from "@/lib/utils";
+import { cn, shortenAddress } from "@/lib/utils";
 import { Dialog } from "@/components/ui/Dialog";
 import { useCoinbasePrice } from "@/lib/hooks/useCoinbasePrice";
+import { useTokenBalances, type TokenInfo } from "@/context/TokenBalancesContext";
 
 // Format large token numbers with K/M/B suffixes
 function formatLargeToken(value: number): string {
@@ -26,13 +26,7 @@ function formatLargeUSD(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
-export interface TokenInfo {
-  address: `0x${string}`;
-  symbol?: string;
-  decimals?: number;
-  logoURI?: string;
-  coinbaseId?: string;
-}
+export type { TokenInfo };
 
 interface TokenSelectorProps {
   selectedToken: TokenInfo | null;
@@ -46,13 +40,7 @@ interface TokenSelectorProps {
 }
 
 interface TokenWithBalance extends TokenInfo {
-  balance?: {
-    decimals: number;
-    formatted: string;
-    symbol: string;
-    value: bigint;
-  };
-  balanceFormatted?: string;
+  balanceFormatted: string;
   usdPrice?: number | null;
   usdValue?: number;
 }
@@ -68,40 +56,25 @@ export function TokenSelector({
 }: TokenSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const { address: walletAddress } = useAccount();
 
-  // Fetch balance for selected token (for display on button)
-  const { data: selectedBalance } = useBalance({
-    address: walletAddress,
-    token:
-      selectedToken?.address === "0x0000000000000000000000000000000000000000"
-        ? undefined
-        : selectedToken?.address,
-  });
+  // Get balances from context (live, no refetch on dialog open)
+  const { getBalance } = useTokenBalances();
 
   // Fetch USD price for selected token
-  const { data: selectedUsdPrice } = useCoinbasePrice(
-    selectedToken?.coinbaseId,
-  );
-
-  // Fetch all token balances and prices for ranking
-  const [sortedTokens, setSortedTokens] =
-    useState<TokenInfo[]>(availableTokens);
+  const { data: selectedUsdPrice } = useCoinbasePrice(selectedToken?.coinbaseId);
 
   // Filter tokens by search query
   const filteredTokens = useMemo(() => {
-    const toFilter = searchQuery ? sortedTokens : availableTokens;
-
-    if (!searchQuery) return toFilter;
+    if (!searchQuery) return availableTokens;
 
     const query = searchQuery.toLowerCase();
-    return toFilter.filter((token) => {
+    return availableTokens.filter((token) => {
       return (
         token.symbol?.toLowerCase().includes(query) ||
         token.address.toLowerCase().includes(query)
       );
     });
-  }, [availableTokens, sortedTokens, searchQuery]);
+  }, [availableTokens, searchQuery]);
 
   const handleSelect = useCallback(
     (token: TokenInfo) => {
@@ -112,12 +85,14 @@ export function TokenSelector({
     [onSelect],
   );
 
+  // Get selected token balance from context
+  const selectedBalance = selectedToken ? getBalance(selectedToken.address) : "0";
+
   // Calculate USD value for display
   const selectedUsdValue = useMemo(() => {
     if (!selectedBalance || !selectedUsdPrice) return null;
-    const balance = parseFloat(
-      formatBigInt(selectedBalance.value, selectedBalance.decimals),
-    );
+    const balance = parseFloat(selectedBalance);
+    if (isNaN(balance)) return null;
     return balance * selectedUsdPrice;
   }, [selectedBalance, selectedUsdPrice]);
 
@@ -168,14 +143,7 @@ export function TokenSelector({
                 </div>
                 {selectedBalance && (
                   <div className="text-xs font-semibold text-stone-500">
-                    {formatLargeToken(
-                      parseFloat(
-                        formatBigInt(
-                          selectedBalance.value,
-                          selectedBalance.decimals,
-                        ),
-                      ),
-                    )}
+                    {formatLargeToken(parseFloat(selectedBalance))}
                   </div>
                 )}
               </div>
@@ -217,13 +185,13 @@ export function TokenSelector({
             />
           </div>
 
-          {/* Token List */}
+          {/* Token List - receives balances via context, no fetching */}
           <TokenList
             tokens={filteredTokens}
-            walletAddress={walletAddress}
             onSelect={handleSelect}
             searchQuery={searchQuery}
             disabledTokenAddress={disabledTokenAddress}
+            getBalance={getBalance}
           />
         </div>
       </Dialog>
@@ -231,59 +199,40 @@ export function TokenSelector({
   );
 }
 
-// Token List with balance ranking
+// Token List with balance ranking - stateless, receives balances as callback
 function TokenList({
   tokens,
-  walletAddress,
   onSelect,
   searchQuery,
   disabledTokenAddress,
+  getBalance,
 }: {
   tokens: TokenInfo[];
-  walletAddress?: string;
   onSelect: (token: TokenInfo) => void;
   searchQuery: string;
   disabledTokenAddress?: `0x${string}` | null;
+  getBalance: (tokenAddress: string) => string;
 }) {
-  // Fetch all balances and prices - hooks must be called at top level in consistent order
-  const balances = tokens.map((token) =>
-    useBalance({
-      address: walletAddress as `0x${string}` | undefined,
-      token:
-        token.address === "0x0000000000000000000000000000000000000000"
-          ? undefined
-          : token.address,
-    })
-  );
-
+  // Fetch prices for USD value calculation (still needed for sorting)
   const prices = tokens.map((token) => useCoinbasePrice(token.coinbaseId));
 
-  // Combine tokens with their balance and price data
-  const tokensWithData = useMemo(() => {
+  // Combine tokens with balance (from context) and price data
+  const tokensWithData: TokenWithBalance[] = useMemo(() => {
     return tokens.map((token, index) => {
-      const { data: balance } = balances[index];
       const { data: usdPrice } = prices[index];
+      const balanceFormatted = getBalance(token.address);
+      const balance = parseFloat(balanceFormatted) || 0;
 
-      const balanceFormatted = balance
-        ? formatLargeToken(
-            parseFloat(formatBigInt(balance.value, balance.decimals)),
-          )
-        : "0";
-
-      const usdValue =
-        balance && usdPrice
-          ? parseFloat(formatBigInt(balance.value, balance.decimals)) * usdPrice
-          : 0;
+      const usdValue = balance && usdPrice ? balance * usdPrice : 0;
 
       return {
         ...token,
-        balance,
         balanceFormatted,
         usdPrice,
         usdValue,
       };
     });
-  }, [tokens, balances, prices]);
+  }, [tokens, prices, getBalance]);
 
   // Sort by USD value (highest first), unless searching
   const sortedTokens = useMemo(() => {
@@ -416,7 +365,7 @@ function TokenListItem({
         {/* Balance & USD Value */}
         <div className="text-right">
           <div className="font-black text-stone-900">
-            {token.balanceFormatted ?? "0"}
+            {token.balanceFormatted}
           </div>
           {token.usdValue !== undefined && token.usdValue > 0 && (
             <div className="text-xs font-semibold text-stone-500">

@@ -4,6 +4,7 @@ import { SwapForm } from '@/components/dex/SwapForm';
 import { getContractForChain } from '@/config/contracts';
 import { AVAILABLE_TOKENS } from '@/config/tokens';
 import { useAccount } from 'wagmi';
+import { TokenBalancesProvider } from '@/context/TokenBalancesContext';
 
 export default function SwapPage() {
   const { chain } = useAccount();
@@ -16,11 +17,13 @@ export default function SwapPage() {
   return (
     <div className="flex justify-center">
       <div className="w-full max-w-md">
-        <SwapForm
-          factoryAddress={factoryAddress}
-          routerAddress={routerAddress}
-          availableTokens={AVAILABLE_TOKENS}
-        />
+        <TokenBalancesProvider tokens={AVAILABLE_TOKENS}>
+          <SwapForm
+            factoryAddress={factoryAddress}
+            routerAddress={routerAddress}
+            availableTokens={AVAILABLE_TOKENS}
+          />
+        </TokenBalancesProvider>
 
         {/* BITE Explanation */}
         <div className="mt-6 bg-stone-100 border-2 border-black rounded-xl p-4">

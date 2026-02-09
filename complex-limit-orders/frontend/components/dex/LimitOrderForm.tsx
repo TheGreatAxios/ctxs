@@ -29,7 +29,8 @@ import { useTokenPrices } from "@/lib/hooks/useCoinbasePrice";
 import { parseBigInt, formatBigInt } from "@/lib/utils";
 import { formatUnits } from "viem";
 import { CONTRACTS, getContractForChain } from "@/config/contracts";
-import { TokenSelector, type TokenInfo } from "@/components/dex/TokenSelector";
+import { TokenSelector } from "@/components/dex/TokenSelector";
+import { type TokenInfo } from "@/context/TokenBalancesContext";
 import { AVAILABLE_TOKENS } from "@/config/tokens";
 
 interface Pool {

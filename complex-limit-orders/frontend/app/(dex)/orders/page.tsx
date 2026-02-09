@@ -3,6 +3,8 @@
 import { LimitOrderForm } from '@/components/dex/LimitOrderForm';
 import { OrderList } from '@/components/dex/OrderList';
 import { PoolPriceTicker } from '@/components/dex/PoolPriceTicker';
+import { TokenBalancesProvider } from '@/context/TokenBalancesContext';
+import { AVAILABLE_TOKENS } from '@/config/tokens';
 
 export default function OrdersPage() {
   return (
@@ -18,7 +20,9 @@ export default function OrdersPage() {
       <div className="grid lg:grid-cols-2 gap-4 h-[calc(100%-40px)]">
         {/* Left: Trade Form */}
         <div className="min-h-0">
-          <LimitOrderForm />
+          <TokenBalancesProvider tokens={AVAILABLE_TOKENS}>
+            <LimitOrderForm />
+          </TokenBalancesProvider>
         </div>
 
         {/* Right: Live Price Feed (top) + Orders (bottom) */}
