@@ -70,24 +70,36 @@ export function useLiquidPools(factoryAddress?: Address, topN: number = 10) {
   const [pools, setPools] = useState<LiquidPool[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [lastFetch, setLastFetch] = useState(0);
+  const [hasFetched, setHasFetched] = useState(false);
   const publicClient = usePublicClient();
 
   useEffect(() => {
     if (!factoryAddress || !publicClient) return;
 
     const now = Date.now();
-    if (now - lastFetch < CACHE_DURATION && pools.length > 0) {
+    if (now - lastFetch < CACHE_DURATION && hasFetched) {
       return;
     }
 
     const fetchPools = async () => {
       setIsLoading(true);
       try {
+        // Check if factory exists by calling allPairsLength
         const allPairsLength = await publicClient.readContract({
           address: factoryAddress,
           abi: FACTORY_ABI,
           functionName: 'allPairsLength',
         }) as bigint;
+
+        // If result is 0n and no error, factory exists but has no pairs
+        // If result is undefined/null, factory doesn't exist - handled by catch
+        if (!allPairsLength) {
+          setPools([]);
+          setLastFetch(now);
+          setHasFetched(true);
+          setIsLoading(false);
+          return;
+        }
 
         const length = Number(allPairsLength);
         const poolPromises: Promise<PoolData | null>[] = [];
@@ -158,15 +170,26 @@ export function useLiquidPools(factoryAddress?: Address, topN: number = 10) {
 
         setPools(topPools);
         setLastFetch(now);
+        setHasFetched(true);
       } catch (error) {
-        console.error('Error fetching liquid pools:', error);
+        // Silently handle contract not found or no function error
+        // This happens when factory isn't deployed on the current network
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        if (errorMsg.includes('no data') || errorMsg.includes('0x')) {
+          // Factory not deployed or has no pairs - return empty
+          setPools([]);
+          setLastFetch(now);
+        } else {
+          console.error('Error fetching liquid pools:', error);
+        }
+        setHasFetched(true);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchPools();
-  }, [factoryAddress, publicClient, lastFetch, pools.length, topN]);
+  }, [factoryAddress, publicClient, lastFetch, topN]);
 
   return { pools, isLoading };
 }

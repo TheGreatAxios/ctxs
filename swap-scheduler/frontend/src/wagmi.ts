@@ -6,25 +6,25 @@ import { http } from "viem";
 // SKALE Testnet (base-sepolia)
 // Fast block times with 250ms polling for rapid updates
 export const skaleTestnetChain = {
-  id: 2090472038,
+  id: 103698795,
   name: "SKALE Testnet",
   nativeCurrency: { name: "sFUEL", symbol: "sFUEL", decimals: 18 },
   rpcUrls: {
     public: {
       http: [
-        "https://base-sepolia-testnet.skalenodes.com/v1/miniature-live-tabit",
+        "https://base-sepolia-testnet.skalenodes.com/v1/fancy-this-usable-SKALE",
       ],
     },
     default: {
       http: [
-        "https://base-sepolia-testnet.skalenodes.com/v1/miniature-live-tabit",
+        "https://base-sepolia-testnet.skalenodes.com/v1/fancy-this-usable-SKALE",
       ],
     },
   },
   blockExplorers: {
     default: {
       name: "SKALE Explorer",
-      url: "https://base-sepolia-testnet-explorer.skalenodes.com:10012",
+      url: "https://base-sepolia-testnet-explorer.skalenodes.com:10032",
     },
   },
   contracts: {},

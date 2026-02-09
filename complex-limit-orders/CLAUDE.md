@@ -193,9 +193,9 @@ const { thresholdEncrypted } = await encryptAmount(amount, rpcUrl);
 ## Network Configuration
 
 **SKALE Testnet** (primary development target):
-- Chain ID: `2090472038`
-- RPC: `https://base-sepolia-testnet.skalenodes.com/v1/miniature-live-tabit`
-- Explorer: `https://base-sepolia-testnet-explorer.skalenodes.com:10012`
+- Chain ID: `103698795`
+- RPC: `https://base-sepolia-testnet.skalenodes.com/v1/fancy-this-usable-SKALE`
+- Explorer: `https://base-sepolia-testnet-explorer.skalenodes.com:10032`
 - Native currency: sFUEL (no ETH needed)
 
 **Polling**: 250ms for rapid transaction confirmation (SKALE has fast blocks)

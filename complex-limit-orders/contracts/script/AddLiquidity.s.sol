@@ -11,14 +11,14 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  *
  * Usage:
  *   forge script script/AddLiquidity.s.sol \
- *     --rpc-url https://base-sepolia-testnet.skalenodes.com/v1/miniature-live-tabit \
+ *     --rpc-url https://base-sepolia-testnet.skalenodes.com/v1/fancy-this-usable-SKALE \
  *     --account <ACCOUNT_NAME> \
  *     --broadcast \
  *     --sender <YOUR_ADDRESS>
  *
  * Or with private key (not recommended):
  *   forge script script/AddLiquidity.s.sol \
- *     --rpc-url https://base-sepolia-testnet.skalenodes.com/v1/miniature-live-tabit \
+ *     --rpc-url https://base-sepolia-testnet.skalenodes.com/v1/fancy-this-usable-SKALE \
  *     --private-key <PRIVATE_KEY> \
  *     --broadcast
  */

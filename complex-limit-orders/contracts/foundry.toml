@@ -18,6 +18,6 @@ remappings = [
 ]
 
 [rpc_endpoints]
-skale_testnet = "https://base-sepolia-testnet.skalenodes.com/v1/miniature-live-tabit"
+skale_testnet = "https://base-sepolia-testnet.skalenodes.com/v1/fancy-this-usable-SKALE"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

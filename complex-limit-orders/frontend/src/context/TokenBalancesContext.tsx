@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, ReactNode, useMemo } from 'react';
+import { createContext, useContext, ReactNode, useMemo, useRef, useCallback } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { formatBigInt } from '@/lib/utils';
 
@@ -20,6 +20,7 @@ export interface TokenBalance {
 interface TokenBalancesContextType {
   getBalance: (tokenAddress: string) => string;
   getTokenBalance: (token: TokenInfo) => TokenBalance | null;
+  balancesMap: Map<string, string>;
 }
 
 const TokenBalancesContext = createContext<TokenBalancesContextType | undefined>(undefined);
@@ -43,30 +44,46 @@ export function TokenBalancesProvider({ children, tokens }: TokenBalancesProvide
     })
   );
 
-  const getBalance = useMemo(() => {
-    return (tokenAddress: string): string => {
-      const index = tokens.findIndex((t) => t.address.toLowerCase() === tokenAddress.toLowerCase());
-      if (index === -1) return '0';
+  // Build a stable map of balances - only recreate when actual balance data changes
+  const balancesMap = useMemo(() => {
+    const map = new Map<string, string>();
+    tokens.forEach((token, index) => {
       const { data } = balances[index];
-      if (!data) return '0';
-      return formatBigInt(data.value, data.decimals);
-    };
+      if (data) {
+        map.set(token.address.toLowerCase(), formatBigInt(data.value, data.decimals));
+      } else {
+        map.set(token.address.toLowerCase(), '0');
+      }
+    });
+    return map;
   }, [tokens, balances]);
 
-  const getTokenBalance = useMemo(() => {
-    return (token: TokenInfo): TokenBalance | null => {
-      const index = tokens.findIndex((t) => t.address.toLowerCase() === token.address.toLowerCase());
-      if (index === -1) return null;
-      const { data } = balances[index];
-      if (!data) return null;
-      return {
-        balance: formatBigInt(data.value, data.decimals),
-      };
-    };
-  }, [tokens, balances]);
+  // Stable reference for getBalance using useCallback
+  const getBalance = useCallback(
+    (tokenAddress: string): string => {
+      return balancesMap.get(tokenAddress.toLowerCase()) ?? '0';
+    },
+    [balancesMap]
+  );
+
+  // Stable reference for getTokenBalance using useCallback
+  const getTokenBalance = useCallback(
+    (token: TokenInfo): TokenBalance | null => {
+      const balance = balancesMap.get(token.address.toLowerCase());
+      if (!balance) return null;
+      return { balance };
+    },
+    [balancesMap]
+  );
+
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(
+    () => ({ getBalance, getTokenBalance, balancesMap }),
+    [getBalance, getTokenBalance, balancesMap]
+  );
 
   return (
-    <TokenBalancesContext.Provider value={{ getBalance, getTokenBalance }}>
+    <TokenBalancesContext.Provider value={contextValue}>
       {children}
     </TokenBalancesContext.Provider>
   );

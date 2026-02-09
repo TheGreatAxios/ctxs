@@ -63,7 +63,7 @@ forge script script/Deploy.s.sol \
 
 # Deploy (via anvil fork - recommended for testing)
 # Terminal 1: Start forked anvil
-anvil --fork-url https://base-sepolia-testnet.skalenodes.com/v1/miniature-live-tabit
+anvil --fork-url https://base-sepolia-testnet.skalenodes.com/v1/fancy-this-usable-SKALE
 
 # Terminal 2: Deploy
 forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast --sender 0xYOUR_ADDRESS

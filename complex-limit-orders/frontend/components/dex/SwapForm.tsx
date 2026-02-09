@@ -15,17 +15,17 @@ import { useTokenAllowance, useReserves } from '@/lib/hooks/useContractRead';
 import { useTokenPriceByAddress } from '@/lib/hooks/useTokenPrices';
 import { useRoute } from '@/lib/hooks/useRoute';
 import { useSwapAmounts } from '@/context/SwapAmountsContext';
+import { CHAIN_ID } from '@/config/index';
 import BiteSwapV2PairABI from '../../abi/BiteSwapV2Pair.json';
 
 const DEADLINE_MINUTES = 20;
+const TARGET_CHAIN_ID = CHAIN_ID;
 
 interface SwapFormProps {
   factoryAddress?: `0x${string}`;
   routerAddress?: `0x${string}`;
   availableTokens?: TokenInfo[];
 }
-
-const TARGET_CHAIN_ID = 2090472038;
 
 // Safe number formatter to handle NaN
 const safeFixed = (value: number | null | undefined, decimals: number): string => {
@@ -318,7 +318,8 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
         </Button>
       );
     }
-    if (isLoadingRoute) {
+    // Only show loading when there's an amount being routed
+    if (isLoadingRoute && amountInForRoute) {
       return (
         <Button
           disabled

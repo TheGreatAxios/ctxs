@@ -32,6 +32,7 @@ import { CONTRACTS, getContractForChain } from "@/config/contracts";
 import { TokenSelector } from "@/components/dex/TokenSelector";
 import { type TokenInfo } from "@/context/TokenBalancesContext";
 import { AVAILABLE_TOKENS } from "@/config/tokens";
+import { CHAIN_ID } from "@/config/index";
 
 interface Pool {
   address: Address;
@@ -43,7 +44,7 @@ interface Pool {
   balance1: bigint;
 }
 
-const TARGET_CHAIN_ID = 2090472038;
+const TARGET_CHAIN_ID = CHAIN_ID;
 
 export function LimitOrderForm() {
   const { address, chainId, chain } = useAccount();

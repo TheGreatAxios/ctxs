@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { Search, ChevronDown } from "lucide-react";
 import { cn, shortenAddress } from "@/lib/utils";
 import { Dialog } from "@/components/ui/Dialog";
-import { useCoinbasePrice } from "@/lib/hooks/useCoinbasePrice";
+import { useCoinbasePriceById } from "@/lib/hooks/useCoinbasePrice";
 import { useTokenBalances, type TokenInfo } from "@/context/TokenBalancesContext";
 
 // Format large token numbers with K/M/B suffixes
@@ -61,7 +61,7 @@ export function TokenSelector({
   const { getBalance } = useTokenBalances();
 
   // Fetch USD price for selected token
-  const { data: selectedUsdPrice } = useCoinbasePrice(selectedToken?.coinbaseId);
+  const { data: selectedUsdPrice } = useCoinbasePriceById(selectedToken?.coinbaseId);
 
   // Filter tokens by search query
   const filteredTokens = useMemo(() => {
@@ -214,7 +214,7 @@ function TokenList({
   getBalance: (tokenAddress: string) => string;
 }) {
   // Fetch prices for USD value calculation (still needed for sorting)
-  const prices = tokens.map((token) => useCoinbasePrice(token.coinbaseId));
+  const prices = tokens.map((token) => useCoinbasePriceById(token.coinbaseId));
 
   // Combine tokens with balance (from context) and price data
   const tokensWithData: TokenWithBalance[] = useMemo(() => {

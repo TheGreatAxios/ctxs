@@ -8,13 +8,13 @@ import {
 } from "@/lib/hooks/usePool";
 import { useMultipleTokenInfo, type TokenInfo } from "@/lib/hooks/useToken";
 import { useCoinbasePriceById } from "@/lib/hooks/useCoinbasePrice";
-import { getContractForChain } from "@/config/contracts";
+import { getContractForChain, CHAIN_ID } from "@/config/index";
 import { formatUnits, type Address } from "viem";
 import { useAccount } from "wagmi";
 
 export function PoolList() {
   const { chain } = useAccount();
-  const contracts = getContractForChain(chain?.id ?? 2090472038);
+  const contracts = getContractForChain(chain?.id ?? CHAIN_ID);
 
   if (!contracts) {
     return (

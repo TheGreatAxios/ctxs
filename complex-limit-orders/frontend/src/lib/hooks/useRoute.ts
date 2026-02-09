@@ -1,8 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { usePublicClient } from 'wagmi';
 import type { Address } from 'viem';
-import { useLiquidPools, type LiquidPool } from './useLiquidPools';
-import { usePairAddress } from './usePairAddress';
+import { PAIRS, TOKENS } from '@/config/index';
 
 const PAIR_ABI = [
   {
@@ -16,6 +15,13 @@ const PAIR_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
+  {
+    inputs: [],
+    name: 'token0',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ] as const;
 
 export interface Route {
@@ -24,210 +30,192 @@ export interface Route {
   estimatedOutput: bigint;
 }
 
-const MAX_HOPS = 4;
+// All possible routes derived from PAIRS config
+const TOKEN_ADDRESSES = Object.values(TOKENS).map(t => t.address.toLowerCase());
 
-function buildTokenGraph(pools: LiquidPool[]): Map<Address, Set<Address>> {
-  const graph = new Map<Address, Set<Address>>();
+// Build route map from PAIRS config: pairAddress -> {token0, token1}
+const PAIR_MAP = new Map<string, {token0: Address; token1: Address}>();
+Object.entries(PAIRS).forEach(([_, address]) => {
+  PAIR_MAP.set(address.toLowerCase(), { token0: '' as Address, token1: '' as Address });
+});
 
-  for (const pool of pools) {
-    if (!graph.has(pool.token0)) {
-      graph.set(pool.token0, new Set());
-    }
-    if (!graph.has(pool.token1)) {
-      graph.set(pool.token1, new Set());
-    }
-    graph.get(pool.token0)!.add(pool.token1);
-    graph.get(pool.token1)!.add(pool.token0);
-  }
+// Build token graph from PAIRS for 2-hop routing
+function findRoute(from: Address, to: Address): Address[] | null {
+  const fromLower = from.toLowerCase();
+  const toLower = to.toLowerCase();
 
-  return graph;
-}
+  if (fromLower === toLower) return null;
 
-function bfsAllPaths(
-  from: Address,
-  to: Address,
-  graph: Map<Address, Set<Address>>,
-  maxHops: number
-): Address[][] {
-  const paths: Address[][] = [];
-  const queue: { node: Address; path: Address[] }[] = [{ node: from, path: [from] }];
-  const visited = new Set<string>();
+  // Check for direct pair by looking through PAIRS
+  for (const [pairName, pairAddress] of Object.entries(PAIRS)) {
+    const [token0Symbol, token1Symbol] = pairName.split('_');
+    const token0Address = TOKENS[token0Symbol]?.address.toLowerCase();
+    const token1Address = TOKENS[token1Symbol]?.address.toLowerCase();
 
-  while (queue.length > 0) {
-    const { node, path } = queue.shift()!;
+    if (!token0Address || !token1Address) continue;
 
-    if (node === to) {
-      paths.push(path);
-      continue;
-    }
-
-    if (path.length - 1 >= maxHops) continue;
-
-    const neighbors = graph.get(node) || new Set();
-    for (const neighbor of neighbors) {
-      const key = `${neighbor}-${path.length}`;
-      if (!visited.has(key)) {
-        visited.add(key);
-        queue.push({
-          node: neighbor,
-          path: [...path, neighbor],
-        });
-      }
+    if ((fromLower === token0Address && toLower === token1Address) ||
+        (fromLower === token1Address && toLower === token0Address)) {
+      return [from, to];
     }
   }
 
-  return paths;
+  // Check for 2-hop route via intermediate token
+  for (const intermediate of TOKEN_ADDRESSES) {
+    if (intermediate === fromLower || intermediate === toLower) continue;
+
+    // Check if from -> intermediate exists
+    const fromToIntermediate = hasDirectPair(fromLower, intermediate);
+    // Check if intermediate -> to exists
+    const intermediateToTo = hasDirectPair(intermediate, toLower);
+
+    if (fromToIntermediate && intermediateToTo) {
+      return [from, intermediate as Address, to];
+    }
+  }
+
+  return null;
 }
 
-async function estimateOutputForPath(
-  path: Address[],
+function hasDirectPair(tokenA: string, tokenB: string): boolean {
+  for (const [pairName, _] of Object.entries(PAIRS)) {
+    const [symbol0, symbol1] = pairName.split('_');
+    const addr0 = TOKENS[symbol0]?.address.toLowerCase();
+    const addr1 = TOKENS[symbol1]?.address.toLowerCase();
+
+    if (!addr0 || !addr1) continue;
+
+    if ((tokenA === addr0 && tokenB === addr1) ||
+        (tokenA === addr1 && tokenB === addr0)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getPairAddress(tokenA: string, tokenB: string): Address | null {
+  for (const [pairName, pairAddress] of Object.entries(PAIRS)) {
+    const [symbol0, symbol1] = pairName.split('_');
+    const addr0 = TOKENS[symbol0]?.address.toLowerCase();
+    const addr1 = TOKENS[symbol1]?.address.toLowerCase();
+
+    if (!addr0 || !addr1) continue;
+
+    if ((tokenA === addr0 && tokenB === addr1) ||
+        (tokenA === addr1 && tokenB === addr0)) {
+      return pairAddress;
+    }
+  }
+  return null;
+}
+
+async function getOutputForPair(
+  pairAddress: Address,
   amountIn: bigint,
-  getReservesFn: (tokenA: Address, tokenB: Address) => Promise<readonly [bigint, bigint] | null>
+  inputToken: Address,
+  publicClient: NonNullable<ReturnType<typeof usePublicClient>>
 ): Promise<bigint> {
-  let currentAmount = amountIn;
+  try {
+    const [reserves, token0] = await Promise.all([
+      publicClient.readContract({
+        address: pairAddress,
+        abi: PAIR_ABI,
+        functionName: 'getReserves',
+      }),
+      publicClient.readContract({
+        address: pairAddress,
+        abi: PAIR_ABI,
+        functionName: 'token0',
+      }),
+    ]);
 
-  for (let i = 0; i < path.length - 1; i++) {
-    const tokenA = path[i];
-    const tokenB = path[i + 1];
-    const reserves = await getReservesFn(tokenA, tokenB);
-
-    if (!reserves || reserves[0] === 0n || reserves[1] === 0n) {
-      return 0n;
-    }
-
-    const [reserve0, reserve1] = reserves;
-    const isToken0Input = tokenA.toLowerCase() < tokenB.toLowerCase();
-
+    const [reserve0, reserve1] = (reserves as readonly [bigint, bigint, unknown]).slice(0, 2) as [bigint, bigint];
+    const token0Address = token0 as Address;
+    const isToken0Input = inputToken.toLowerCase() === token0Address.toLowerCase();
     const reserveIn = isToken0Input ? reserve0 : reserve1;
     const reserveOut = isToken0Input ? reserve1 : reserve0;
 
-    const amountInWithFee = currentAmount * 997n;
+    if (reserveIn === 0n || reserveOut === 0n) return 0n;
+
+    // 0.3% fee
+    const amountInWithFee = amountIn * 997n;
     const numerator = amountInWithFee * reserveOut;
     const denominator = reserveIn * 1000n + amountInWithFee;
 
-    currentAmount = numerator / denominator;
-    if (currentAmount === 0n) {
-      return 0n;
-    }
+    return numerator / denominator;
+  } catch {
+    return 0n;
   }
-
-  return currentAmount;
-}
-
-interface PoolReserves {
-  tokenA: Address;
-  tokenB: Address;
-  reserves: readonly [bigint, bigint];
 }
 
 export function useRoute(
-  factoryAddress?: Address,
-  fromToken?: Address,
-  toToken?: Address,
-  amountIn?: bigint
+  factoryAddress: Address | undefined,
+  fromToken: Address | undefined,
+  toToken: Address | undefined,
+  amountIn: bigint | undefined
 ): { route: Route | null; isLoading: boolean } {
-  const publicClient = usePublicClient();
   const [route, setRoute] = useState<Route | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const { pools, isLoading: isLoadingPools } = useLiquidPools(factoryAddress, 10);
-  const { pairAddress } = usePairAddress(factoryAddress, fromToken, toToken);
+  const [isLoading, setIsLoading] = useState(false);
+  const publicClient = usePublicClient();
 
   useEffect(() => {
-    if (!fromToken || !toToken || !amountIn || !publicClient || isLoadingPools) {
+    if (!fromToken || !toToken || !amountIn || !publicClient) {
       setRoute(null);
-      setIsSearching(false);
+      setIsLoading(false);
       return;
     }
 
-    if (fromToken.toLowerCase() === toToken.toLowerCase()) {
-      setRoute(null);
-      setIsSearching(false);
-      return;
-    }
+    const calculateRoute = async () => {
+      setIsLoading(true);
 
-    const findRoute = async () => {
-      setIsSearching(true);
-      const hasDirectPair = pairAddress && pairAddress !== '0x0000000000000000000000000000000000000000';
+      // Type guard for TypeScript
+      const client = publicClient;
 
-      const reservesCache = new Map<string, readonly [bigint, bigint]>();
+      const path = findRoute(fromToken, toToken);
 
-      const getReservesFn = async (tokenA: Address, tokenB: Address): Promise<readonly [bigint, bigint] | null> => {
-        const key = [tokenA, tokenB].sort().join('-');
-        if (reservesCache.has(key)) {
-          return reservesCache.get(key)!;
-        }
-
-        try {
-          const factoryAbi = [
-            {
-              inputs: [
-                { name: 'tokenA', type: 'address' },
-                { name: 'tokenB', type: 'address' },
-              ],
-              name: 'getPair',
-              outputs: [{ name: 'pair', type: 'address' }],
-              stateMutability: 'view',
-              type: 'function',
-            },
-          ];
-
-          const pairAddr = await publicClient.readContract({
-            address: factoryAddress!,
-            abi: factoryAbi,
-            functionName: 'getPair',
-            args: [tokenA, tokenB],
-          }) as Address;
-
-          if (!pairAddr || pairAddr === '0x0000000000000000000000000000000000000000') {
-            return null;
-          }
-
-          const reserves = await publicClient.readContract({
-            address: pairAddr,
-            abi: PAIR_ABI,
-            functionName: 'getReserves',
-          }) as unknown as readonly [bigint, bigint, bigint];
-
-          reservesCache.set(key, [reserves[0], reserves[1]]);
-          return [reserves[0], reserves[1]];
-        } catch {
-          return null;
-        }
-      };
-
-      // Check direct pair first
-      if (hasDirectPair) {
-        const reserves = await getReservesFn(fromToken, toToken);
-        if (reserves && reserves[0] !== 0n && reserves[1] !== 0n) {
-          const output = await estimateOutputForPath([fromToken, toToken], amountIn, getReservesFn);
-          if (output > 0n) {
-            setRoute({ path: [fromToken, toToken], hops: 1, estimatedOutput: output });
-            setIsSearching(false);
-            return;
-          }
-        }
+      if (!path) {
+        setRoute(null);
+        setIsLoading(false);
+        return;
       }
 
-      // BFS for multi-hop routes
-      const graph = buildTokenGraph(pools);
-      const allPaths = bfsAllPaths(fromToken, toToken, graph, MAX_HOPS);
+      // Calculate output through the path
+      let currentAmount = amountIn;
+      let validRoute = true;
 
-      let bestRoute: Route | null = null;
-      for (const path of allPaths) {
-        const output = await estimateOutputForPath(path, amountIn, getReservesFn);
-        if (output === 0n) continue;
+      for (let i = 0; i < path.length - 1; i++) {
+        const tokenA = path[i];
+        const tokenB = path[i + 1];
+        const pairAddress = getPairAddress(tokenA, tokenB);
 
-        if (!bestRoute || output > bestRoute.estimatedOutput) {
-          bestRoute = { path, hops: path.length - 1, estimatedOutput: output };
+        if (!pairAddress) {
+          validRoute = false;
+          break;
         }
+
+        const output = await getOutputForPair(pairAddress, currentAmount, tokenA, client);
+        if (output === 0n) {
+          validRoute = false;
+          break;
+        }
+        currentAmount = output;
       }
 
-      setRoute(bestRoute);
-      setIsSearching(false);
+      if (validRoute && currentAmount > 0n) {
+        setRoute({
+          path,
+          hops: path.length - 1,
+          estimatedOutput: currentAmount,
+        });
+      } else {
+        setRoute(null);
+      }
+
+      setIsLoading(false);
     };
 
-    findRoute();
-  }, [fromToken, toToken, amountIn, publicClient, pools, isLoadingPools, pairAddress, factoryAddress]);
+    calculateRoute();
+  }, [fromToken, toToken, amountIn, publicClient]);
 
-  return { route, isLoading: isSearching || isLoadingPools };
+  return { route, isLoading };
 }

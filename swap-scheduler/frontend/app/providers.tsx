@@ -4,36 +4,21 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider } from "wagmi";
 import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { ReactNode, useState } from "react";
-import { config } from "@/wagmi";
-import { TokenPricesProvider } from "@/lib/hooks/useTokenPrices";
-import { SwapAmountsProvider } from "@/context/SwapAmountsContext";
+import { config, skaleTestnetChain } from "@/wagmi";
 
 type ProvidersProps = {
   children: ReactNode;
 };
 
 export function Providers({ children }: ProvidersProps) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 60 * 1000,
-            refetchOnWindowFocus: false,
-            retry: 1,
-          },
-        },
-      }),
-  );
+  const [queryClient] = useState(() => new QueryClient());
 
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <TokenPricesProvider>
-          <SwapAmountsProvider>
-            <RainbowKitProvider>{children}</RainbowKitProvider>
-          </SwapAmountsProvider>
-        </TokenPricesProvider>
+        <RainbowKitProvider chains={[skaleTestnetChain]}>
+          {children}
+        </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

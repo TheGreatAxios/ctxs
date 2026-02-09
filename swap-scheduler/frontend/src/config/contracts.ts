@@ -4,7 +4,7 @@ import BiteSwapV2RouterABI from "../../abi/BiteSwapV2Router.json";
 import BiteSwapV2PairABI from "../../abi/BiteSwapV2Pair.json";
 import type { Address } from "viem";
 
-const TARGET_CHAIN_ID = 2090472038;
+const TARGET_CHAIN_ID = 103698795;
 
 // SKALE BITE V2 Precompile Addresses (fixed across all SKALE chains)
 export const PRECOMPILES = {
@@ -32,7 +32,7 @@ interface ChainContractConfig {
 
 // Deployed addresses - Feb 2025 (checksummed)
 const CHAIN_CONTRACTS: Record<number, ChainContractConfig> = {
-  2090472038: {
+  103698795: {
     scheduledSwapBook: '0x6EB7DdA20486a5ebFa904Ab310f8e7336ca6D803' as Address,
     factory: '0xEF84a39A2b0a600EA91bB6927DB519f5834ebf36' as Address,
     router: '0x2dB91801b667ED6Cad305c9882F3bc0D2EDa6b24' as Address,

@@ -19,7 +19,16 @@ export function formatBigInt(value: bigint, decimals: number = 18): string {
 }
 
 export function parseBigInt(value: string, decimals: number = 18): bigint {
-  const [integerStr = '0', fractionalStr = ''] = value.split('.');
+  // Handle empty or invalid input
+  if (!value || value.trim() === '' || value === '-' || value === '.') {
+    return 0n;
+  }
+
+  // Remove invalid characters (anything not digit or dot)
+  const cleaned = value.replace(/[^0-9.]/g, '');
+  if (!cleaned) return 0n;
+
+  const [integerStr = '0', fractionalStr = ''] = cleaned.split('.');
   const integer = BigInt(integerStr);
   const fractional = BigInt(
     (fractionalStr || '').padEnd(decimals, '0').slice(0, decimals)
