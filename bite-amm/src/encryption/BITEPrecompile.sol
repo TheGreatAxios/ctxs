@@ -1,4 +1,4 @@
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 library BITEPrecompile {
     /// @notice Submit a conditional transaction

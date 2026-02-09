@@ -1,4 +1,4 @@
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 interface IConditionChecker {
     /// @notice Check if condition is met

@@ -11,13 +11,28 @@ import { skaleCtxChain } from "@/wagmi";
 import { useContracts } from "@/config/contracts";
 
 // All keys lowercase for consistent matching
+// Format: "token0/token1" - token0 is first in pair
+// Must match addresses in contracts.ts
 const POOL_NAMES: Record<string, string> = {
-  "0xf4ff9d2a6c0fe0e343fb8bb47199f73bc076378d": "USDC/WETH",
-  "0x856d16cedc67faed5ebdad091f769935298f0ecb": "USDC/WBTC",
-  "0xe3a44195a3160ea9ee7a76db2f82155a43c836c5": "USDT/WETH",
-  "0x49b655a57464f154285282eb907bedff493779f": "USDT/WBTC",
-  "0xce9d9af3fa43c5f3a14132b4bc0de66b877f7069": "WETH/WBTC",
+  "0x723bb841b1d04a587f93822cca6ff6e8efbee3ab": "USDC/WETH",
+  "0x73b5ebcb81c54308cec3c6d74f45bfeebdabe3f3": "USDC/WBTC",
+  "0x4c9f01b7730260f34f8952858bed2336b2bbe3e6": "USDT/WETH",
+  "0xf9730fd1f7abf47b9db2034995f63c310ba66463": "USDT/WBTC",
+  "0x8e915c02e97f454b65a847eb9027ac5e74c982f4": "WETH/WBTC",
 };
+
+// Get swap direction display based on pool and contract direction
+// contract direction: true = token0→token1, false = token1→token0
+function getSwapDirection(poolName: string, contractDirection: boolean): { from: string; to: string } {
+  const parts = poolName.split('/');
+  const token0 = parts[0] ?? '?';
+  const token1 = parts[1] ?? '?';
+  if (contractDirection) {
+    return { from: token0, to: token1 };
+  } else {
+    return { from: token1, to: token0 };
+  }
+}
 
 function getPoolName(poolAddress: string): string {
   return POOL_NAMES[poolAddress.toLowerCase()] ?? poolAddress.slice(0, 8);
@@ -117,12 +132,16 @@ export function OrderList() {
               {getPoolName(order.pool)}
             </Link>
 
-            {/* Direction Badge */}
+            {/* Direction Badge - shows actual swap direction */}
             <Badge
-              variant={order.direction ? "open" : "cancelled"}
+              variant="open"
               className="text-[9px] px-1.5 py-0 shrink-0"
             >
-              {order.direction ? "BUY" : "SELL"}
+              {(() => {
+                const poolName = getPoolName(order.pool);
+                const { from, to } = getSwapDirection(poolName, order.direction);
+                return `${from}→${to}`;
+              })()}
             </Badge>
 
             {/* Encrypted Info - compact */}

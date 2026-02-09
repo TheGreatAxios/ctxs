@@ -1,4 +1,4 @@
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../encryption/BITEPrecompile.sol";

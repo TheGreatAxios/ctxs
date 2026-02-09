@@ -1,4 +1,4 @@
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 interface IBiteSwapV2Factory {
     /// @notice Get the pair address for two tokens

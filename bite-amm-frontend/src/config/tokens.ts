@@ -3,25 +3,25 @@ import type { TokenInfo } from "@/components/dex/TokenSelector";
 // Deployed MockTokens - Feb 2025
 export const TOKENS: Record<string, TokenInfo> = {
   USDC: {
-    address: "0xAf5DA2c52B5DCB3e94F937e424fd132eb92FfeEE" as `0x${string}`,
+    address: "0xd66368d1881091b44356a18a29d4529aaefe1e91" as `0x${string}`,
     symbol: "USDC",
     decimals: 6,
     coinbaseId: "usd-coin",
   },
   USDT: {
-    address: "0xE242b5c5D390b5777437423e9C7B13e56a7dFA59" as `0x${string}`,
+    address: "0x7a881a4e39827e69c552dca070f4d8dc36bb3e05" as `0x${string}`,
     symbol: "USDT",
     decimals: 6,
     coinbaseId: "tether",
   },
   WBTC: {
-    address: "0x12A04EAa0e41EaDBE1b12693df3ac82cb7b81375" as `0x${string}`,
+    address: "0xd09aa46abc7d505e9edf77df39c2e45d5893dc60" as `0x${string}`,
     symbol: "WBTC",
     decimals: 8,
     coinbaseId: "wrapped-bitcoin",
   },
   WETH: {
-    address: "0x8F29B307B81b64caf8Ab2DB2559DBa2CeD1DF7Cc" as `0x${string}`,
+    address: "0x1f7fc775e166a9cf7159da03c993c026064bfc86" as `0x${string}`,
     symbol: "WETH",
     decimals: 18,
     coinbaseId: "weth",

@@ -1,4 +1,4 @@
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import "../amm/interfaces/IBiteSwapV2Factory.sol";
 import "../amm/interfaces/IBiteSwapV2Pair.sol";

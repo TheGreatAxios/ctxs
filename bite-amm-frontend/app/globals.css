@@ -207,7 +207,8 @@ button:disabled,
 
   /* Brutalist Link */
   .brutalist-link {
-    @apply relative inline-block;
+    position: relative;
+    display: inline-block;
     text-decoration: none;
     font-weight: 700;
     cursor: pointer;
@@ -215,7 +216,12 @@ button:disabled,
 
   .brutalist-link::after {
     content: '';
-    @apply absolute bottom-0 left-0 right-0 h-1 bg-primary;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 0.25rem;
+    background-color: hsl(var(--primary));
     transform: scaleX(0);
     transform-origin: right;
     transition: transform 0.2s ease;
@@ -228,19 +234,43 @@ button:disabled,
 
   /* Animated Underline for Emphasis */
   .brutalist-underline {
-    @apply relative inline-block;
+    position: relative;
+    display: inline-block;
   }
 
   .brutalist-underline::before {
     content: '';
-    @apply absolute -bottom-1 left-0 right-0 h-2 bg-warning;
+    position: absolute;
+    bottom: -0.0625rem;
+    left: 0;
+    right: 0;
+    height: 0.5rem;
+    background-color: hsl(var(--warning));
     z-index: -1;
     transform: skewX(-12deg);
   }
 
   /* Brutalist Container */
   .brutalist-container {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+    max-width: 80rem;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .brutalist-container {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .brutalist-container {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
   }
 
   /* Brutalist Grid Pattern */
@@ -283,7 +313,10 @@ button:disabled,
 
   /* Brutalist Status Indicators */
   .status-dot {
-    @apply inline-block w-2 h-2 rounded-full;
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
     box-shadow: 0 0 0 3px hsl(var(--background));
   }
 
@@ -358,7 +391,7 @@ button:disabled,
 
 /* Brutalist Loading Spinner */
 .brutalist-spinner {
-  @apply inline-block;
+  display: inline-block;
   width: 1.5rem;
   height: 1.5rem;
   border: 3px solid hsl(var(--border));
