@@ -3,18 +3,6 @@ export interface Passenger {
   betAmount: bigint;
   ejectMultiplier: bigint;
   hasEjected: boolean;
-  hasClaimed: boolean;
-}
-
-export interface FlightInfo {
-  flightNumber: bigint;
-  boardingStartTime: bigint;
-  launchTime: bigint;
-  secondsRemaining: bigint;
-  totalPot: bigint;
-  passengerCount: bigint;
-  isBettingOpen: boolean;
-  hasPassengers: boolean;
 }
 
 export interface GameState {

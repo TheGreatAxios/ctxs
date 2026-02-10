@@ -2,9 +2,9 @@ pragma solidity 0.8.20;
 
 library BITEPrecompile {
     // SKALE BITE V2 Precompile Addresses
-    address internal constant SUBMIT_CTX = 0x0000000000000000000000000000000000001001;
-    address internal constant ENCRYPT_TE = 0x0000000000000000000000000000000000001002;
-    address internal constant ENCRYPT_ECIES = 0x0000000000000000000000000000000000001003;
+    address internal constant SUBMIT_CTX = address(0x1B);
+    address internal constant ENCRYPT_TE = address(0x1C);
+    address internal constant ENCRYPT_ECIES = address(0x1D);
 
     /// @notice Submit a conditional transaction
     /// @param encryptedArgs Encrypted arguments for CTX

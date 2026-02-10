@@ -7,9 +7,13 @@ interface LaunchPadProps {
   passengers: Passenger[];
   account: string | null;
   pendingWithdrawal: bigint;
+  crashPoint: bigint;
+  error: string | null;
   onConnect: () => void;
   onBoard: (amount: string, ejectMultiplier: number) => Promise<void>;
+  onLaunch: () => Promise<void>;
   onWithdraw: () => Promise<void>;
+  onClearError: () => void;
 }
 
 export function LaunchPad({
@@ -17,9 +21,13 @@ export function LaunchPad({
   passengers,
   account,
   pendingWithdrawal,
+  crashPoint,
+  error,
   onConnect,
   onBoard,
+  onLaunch,
   onWithdraw,
+  onClearError,
 }: LaunchPadProps) {
   const [betAmount, setBetAmount] = useState('0.1');
   const [ejectMultiplier, setEjectMultiplier] = useState(2.0);
@@ -45,8 +53,19 @@ export function LaunchPad({
     try {
       await onBoard(betAmount, ejectMultiplier);
       setBetAmount('0.1');
-    } catch (error) {
-      console.error('Boarding failed:', error);
+    } catch (err) {
+      // Error already set in hook
+    } finally {
+      setIsBoarding(false);
+    }
+  };
+
+  const handleLaunch = async () => {
+    setIsBoarding(true);
+    try {
+      await onLaunch();
+    } catch (err) {
+      // Error already set in hook
     } finally {
       setIsBoarding(false);
     }
@@ -157,6 +176,52 @@ export function LaunchPad({
             </motion.div>
           </motion.div>
         </div>
+
+        {/* Error Display */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-4 bg-red-900/40 border border-red-500/50 rounded-xl p-4 flex items-start gap-3"
+            >
+              <span className="text-red-400 text-xl">⚠️</span>
+              <div className="flex-1">
+                <p className="text-red-300 text-sm font-bold">Error</p>
+                <p className="text-red-400 text-xs mt-1">{error}</p>
+              </div>
+              <button
+                onClick={onClearError}
+                className="text-red-400 hover:text-red-300 text-lg leading-none"
+              >
+                ×
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Launch Button (when betting closed but not yet launched) */}
+        <AnimatePresence>
+          {!flightInfo?.isBettingOpen && flightInfo?.hasPassengers && crashPoint === 0n && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="mb-4"
+            >
+              <motion.button
+                onClick={handleLaunch}
+                disabled={isBoarding}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full py-4 rounded-2xl font-black text-lg bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 text-white shadow-lg shadow-orange-500/25 transition-all"
+              >
+                {isBoarding ? 'LAUNCHING...' : '🚀 LAUNCH FLIGHT'}
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence mode="wait">
           {hasBoarded ? (

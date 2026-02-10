@@ -7,8 +7,7 @@ contract Deploy is Script {
     NostradamusRegistry public registry;
 
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast();
 
         registry = new NostradamusRegistry();
 

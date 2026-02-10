@@ -4,11 +4,16 @@ out = "out"
 libs = ["lib"]
 solc_version = "0.8.20"
 evm_version = "istanbul"
-via_ir = true
+via_ir = false
 optimizer = true
 optimizer_runs = 200
 
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+# Remappings
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+]
 
 [rpc_endpoints]
-skale_testnet = "https://base-sepolia-testnet.skalenodes.com/v1/fancy-this-usable-SKALE"
+skale_bite = "https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox"
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

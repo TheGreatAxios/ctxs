@@ -12,8 +12,11 @@ function App() {
     flightInfo,
     passengers,
     pendingWithdrawal,
+    crashPoint,
+    error,
     connect,
     boardRocket,
+    launchFlight,
     withdraw,
   } = useContract();
 
@@ -25,9 +28,10 @@ function App() {
     lastCrashPoint: null,
   });
 
-  const [crashPoint, setCrashPoint] = useState<number | null>(null);
   const [prevFlightNumber, setPrevFlightNumber] = useState<bigint>(0n);
   const flightTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const simTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isDev = import.meta.env.DEV;
 
   // Handle game phase transitions
   useEffect(() => {
@@ -36,7 +40,7 @@ function App() {
     // Check if flight changed
     if (flightInfo.flightNumber !== prevFlightNumber) {
       setPrevFlightNumber(flightInfo.flightNumber);
-      
+
       // Reset game state for new flight
       setGameState({
         currentMultiplier: 1.0,
@@ -45,8 +49,6 @@ function App() {
         flightNumber: flightInfo.flightNumber,
         lastCrashPoint: gameState.lastCrashPoint,
       });
-      setCrashPoint(null);
-      
       // Clear any existing timer
       if (flightTimerRef.current) {
         clearTimeout(flightTimerRef.current);
@@ -54,51 +56,53 @@ function App() {
       }
     }
 
+    // Check if crash point is revealed (no longer 0)
+    const contractCrashPoint = Number(crashPoint);
+    if (contractCrashPoint > 0 && gameState.phase !== 'crashed' && gameState.phase !== 'resolved') {
+      // Convert from hundredths to decimal (e.g., 101 -> 1.01)
+      const actualCrashPoint = contractCrashPoint / 100;
+      setGameState(prev => ({
+        ...prev,
+        phase: 'crashed',
+        targetMultiplier: actualCrashPoint,
+        lastCrashPoint: actualCrashPoint,
+        currentMultiplier: actualCrashPoint,
+      }));
+    }
+
     // Handle phase transitions
     const currentPhase = gameState.phase;
-    
+
     // Waiting -> Boarding (when first passenger boards)
     if (currentPhase === 'waiting' && flightInfo.hasPassengers) {
       setGameState(prev => ({ ...prev, phase: 'boarding' }));
     }
-    
+
     // Boarding -> Launching (when timer hits 0)
-    if (currentPhase === 'boarding' && !flightInfo.isBettingOpen && flightInfo.hasPassengers) {
+    if (currentPhase === 'boarding' && !flightInfo.isBettingOpen && flightInfo.hasPassengers && crashPoint === 0n) {
       setGameState(prev => ({ ...prev, phase: 'launching' }));
-      
-      // After 1 second of launching animation, start flying
-      flightTimerRef.current = setTimeout(() => {
-        // Simulate crash point - in real app, this comes from contract
-        const simulatedCrashPoint = 1.01 + Math.random() * 4;
-        setCrashPoint(simulatedCrashPoint);
-        setGameState(prev => ({ ...prev, phase: 'flying' }));
-      }, 1000);
     }
 
-  }, [flightInfo, prevFlightNumber, gameState.phase, gameState.lastCrashPoint]);
+  }, [flightInfo, prevFlightNumber, gameState.phase, gameState.lastCrashPoint, crashPoint]);
 
-  // Animate multiplier during flight
+  // Animate multiplier during flight (when we know the crash point)
   useEffect(() => {
-    if (gameState.phase !== 'flying' || !crashPoint) return;
+    // Only animate if we're launching and crash point is not yet known
+    if (gameState.phase !== 'launching' || crashPoint > 0) return;
 
     let current = 1.0;
-    const duration = 4000; // 4 seconds to reach crash
+    const targetCrash = 2.5; // Default animation target before actual crash is revealed
+    const duration = 3000; // 3 seconds
     const steps = 60;
-    const increment = (crashPoint - 1) / steps;
+    const increment = (targetCrash - 1) / steps;
     const interval = duration / steps;
 
     const timer = setInterval(() => {
       current += increment;
       setGameState(prev => ({ ...prev, currentMultiplier: current }));
 
-      if (current >= crashPoint) {
+      if (current >= targetCrash) {
         clearInterval(timer);
-        setGameState(prev => ({
-          ...prev,
-          phase: 'crashed',
-          targetMultiplier: crashPoint,
-          lastCrashPoint: crashPoint,
-        }));
       }
     }, interval);
 
@@ -111,7 +115,74 @@ function App() {
       if (flightTimerRef.current) {
         clearTimeout(flightTimerRef.current);
       }
+      if (simTimerRef.current) {
+        clearInterval(simTimerRef.current);
+      }
     };
+  }, []);
+
+  // Simulation function for dev mode
+  const runSimulation = useCallback(() => {
+    // Clear any existing simulation
+    if (simTimerRef.current) {
+      clearInterval(simTimerRef.current);
+    }
+
+    const crashAt = 2 + Math.random() * 6; // Random crash between 2x and 8x
+    let current = 1.0;
+    const duration = 10000; // 10 seconds total
+    const steps = 100;
+    const interval = duration / steps;
+    const increment = 9 / steps; // Go from 1x to 10x
+
+    // Start launching phase
+    setGameState({
+      currentMultiplier: 1.0,
+      targetMultiplier: null,
+      phase: 'launching',
+      flightNumber: 999999n,
+      lastCrashPoint: null,
+    });
+
+    // After 500ms, switch to flying
+    setTimeout(() => {
+      setGameState(prev => ({ ...prev, phase: 'flying' }));
+
+      // Animate multiplier
+      simTimerRef.current = setInterval(() => {
+        current += increment;
+
+        if (current >= crashAt) {
+          // Crash!
+          if (simTimerRef.current) {
+            clearInterval(simTimerRef.current);
+          }
+          setGameState({
+            currentMultiplier: crashAt,
+            targetMultiplier: crashAt,
+            phase: 'crashed',
+            flightNumber: 999999n,
+            lastCrashPoint: crashAt,
+          });
+
+          // Reset after 3 seconds
+          setTimeout(() => {
+            setGameState({
+              currentMultiplier: 1.0,
+              targetMultiplier: null,
+              phase: 'waiting',
+              flightNumber: 0n,
+              lastCrashPoint: crashAt,
+            });
+          }, 3000);
+        } else {
+          setGameState(prev => ({
+            ...prev,
+            currentMultiplier: current,
+          }));
+        }
+      }, interval);
+    }, 500);
   }, []);
 
   return (
@@ -121,7 +192,7 @@ function App() {
         <motion.div
           className="absolute inset-0"
           style={{
-            background: 'radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 50%)',
+            backgroundColor: 'rgba(59, 130, 246, 0.08)',
           }}
           animate={{
             scale: [1, 1.2, 1],
@@ -132,7 +203,7 @@ function App() {
         <motion.div
           className="absolute inset-0"
           style={{
-            background: 'radial-gradient(circle at 20% 80%, rgba(168, 85, 247, 0.05) 0%, transparent 40%)',
+            backgroundColor: 'rgba(168, 85, 247, 0.05)',
           }}
           animate={{
             x: [0, 50, 0],
@@ -161,10 +232,8 @@ function App() {
               🚀
             </motion.div>
             <div>
-              <h1 className="text-3xl font-black">
-                <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  ROCKET CRASH
-                </span>
+              <h1 className="text-3xl font-black text-white">
+                CRASH
               </h1>
               <p className="text-xs text-gray-500 font-bold tracking-wider">SKALE EDITION • PROVABLY FAIR</p>
             </div>
@@ -175,6 +244,17 @@ function App() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
           >
+            {isDev && (
+              <motion.button
+                onClick={runSimulation}
+                whileHover={{ scale: 1.05, boxShadow: '0 0 30px rgba(34, 197, 94, 0.5)' }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-green-600 text-white px-6 py-4 rounded-2xl font-black text-sm tracking-wider transition-all"
+                title="Simulate rocket flight (0-10s)"
+              >
+                🧪 SIM
+              </motion.button>
+            )}
             {account ? (
               <motion.div 
                 className="bg-gray-900/80 border border-gray-700/50 rounded-2xl px-5 py-3 backdrop-blur-sm"
@@ -190,7 +270,7 @@ function App() {
                 onClick={connect}
                 whileHover={{ scale: 1.05, boxShadow: '0 0 30px rgba(59, 130, 246, 0.5)' }}
                 whileTap={{ scale: 0.95 }}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-2xl font-black text-sm tracking-wider transition-all"
+                className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-sm tracking-wider transition-all"
               >
                 CONNECT WALLET
               </motion.button>
@@ -214,9 +294,13 @@ function App() {
               passengers={passengers}
               account={account}
               pendingWithdrawal={pendingWithdrawal}
+              crashPoint={crashPoint}
+              error={error}
               onConnect={connect}
               onBoard={boardRocket}
+              onLaunch={launchFlight}
               onWithdraw={withdraw}
+              onClearError={() => {}}
             />
           </motion.div>
 
@@ -264,21 +348,21 @@ function App() {
               icon: '🎲',
               title: 'SKALE Native RNG',
               desc: 'Free consensus-based randomness. No Chainlink needed. Provably fair and instant.',
-              color: 'from-blue-500/20 to-cyan-500/20',
+              bgColor: 'bg-blue-900/20',
               border: 'border-blue-500/30',
             },
             {
               icon: '🔐',
               title: 'BITE Encryption',
               desc: 'Crash point encrypted with threshold encryption. No front-running, no manipulation.',
-              color: 'from-purple-500/20 to-pink-500/20',
+              bgColor: 'bg-purple-900/20',
               border: 'border-purple-500/30',
             },
             {
               icon: '⚡',
               title: '2-Second Finality',
               desc: 'Lightning-fast blocks with SKALE. Quick games, instant settlements, no waiting.',
-              color: 'from-yellow-500/20 to-orange-500/20',
+              bgColor: 'bg-yellow-900/20',
               border: 'border-yellow-500/30',
             },
           ].map((card, i) => (
@@ -289,7 +373,7 @@ function App() {
                 y: -5,
                 boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
               }}
-              className={`bg-gradient-to-br ${card.color} rounded-2xl p-6 border ${card.border} backdrop-blur-sm transition-all`}
+              className={`${card.bgColor} rounded-2xl p-6 border ${card.border} backdrop-blur-sm transition-all`}
             >
               <motion.div 
                 className="text-4xl mb-4"

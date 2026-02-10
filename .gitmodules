@@ -1,0 +1,6 @@
+[submodule "rocket-crash/contracts/lib/skale-rng"]
+	path = rocket-crash/contracts/lib/skale-rng
+	url = https://github.com/TheGreatAxios/skale-rng
+[submodule "rocket-crash/contracts/lib/forge-std"]
+	path = rocket-crash/contracts/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std

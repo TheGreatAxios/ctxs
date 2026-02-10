@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Passenger, AgentAvatar } from '../types';
 import { AGENT_AVATARS } from '../types';
@@ -29,7 +29,6 @@ export function FlightView({
   const [showExplosion, setShowExplosion] = useState(false);
   const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; color: string }>>([]);
 
-  // Assign avatars to passengers
   useEffect(() => {
     const withAvatars = passengers.map((p, i) => ({
       passenger: p,
@@ -40,7 +39,6 @@ export function FlightView({
     setAnimatedPassengers(withAvatars);
   }, [passengers, phase]);
 
-  // Handle ejections during flight
   useEffect(() => {
     if (phase === 'flying' && crashPoint) {
       setAnimatedPassengers((prev) =>
@@ -57,7 +55,6 @@ export function FlightView({
     if (phase === 'crashed' && crashPoint) {
       setShowExplosion(true);
       
-      // Create explosion particles
       const newParticles = Array.from({ length: 20 }, (_, i) => ({
         id: i,
         x: Math.random() * 400 - 200,
@@ -78,12 +75,10 @@ export function FlightView({
         })
       );
 
-      // Clear particles after animation
-      setTimeout(() => setParticles([]), 2000);
+      setTimeout(() => setParticles([]), 3000);
     }
   }, [phase, currentMultiplier, crashPoint]);
 
-  // Reset on new flight
   useEffect(() => {
     if (phase === 'waiting' || phase === 'boarding') {
       setShowExplosion(false);
@@ -101,11 +96,6 @@ export function FlightView({
     return 0;
   };
 
-  const getRocketScale = () => {
-    if (phase === 'launching') return [1, 0.9, 1.1];
-    return 1;
-  };
-
   const flyingPassengers = useMemo(() => 
     animatedPassengers.filter((ap) => ap.status === 'flying' || ap.status === 'waiting'),
     [animatedPassengers]
@@ -117,7 +107,7 @@ export function FlightView({
   );
 
   return (
-    <div className="relative h-[550px] bg-gradient-to-b from-black via-gray-950 to-gray-900 rounded-3xl overflow-hidden border border-gray-800/50">
+    <div className="relative h-[550px] bg-black rounded-3xl overflow-hidden border border-gray-800/50">
       {/* Animated starfield */}
       <div className="absolute inset-0 overflow-hidden">
         {Array.from({ length: 100 }).map((_, i) => (
@@ -143,7 +133,6 @@ export function FlightView({
           />
         ))}
         
-        {/* Moving stars effect */}
         {(phase === 'flying' || phase === 'launching') && (
           <motion.div
             className="absolute inset-0"
@@ -153,7 +142,7 @@ export function FlightView({
             {Array.from({ length: 50 }).map((_, i) => (
               <motion.div
                 key={`move-${i}`}
-                className="absolute w-0.5 h-8 bg-gradient-to-b from-transparent via-blue-400/50 to-transparent rounded-full"
+                className="absolute w-0.5 h-8 bg-blue-400/50 rounded-full"
                 style={{
                   left: `${Math.random() * 100}%`,
                   top: `${Math.random() * 100}%`,
@@ -172,16 +161,12 @@ export function FlightView({
           }`}
           animate={{
             scale: phase === 'crashed' ? [1, 1.5, 1] : phase === 'flying' ? [1, 1.02, 1] : 1,
-            textShadow: phase === 'flying' 
-              ? ['0 0 20px rgba(255,255,255,0.5)', '0 0 40px rgba(255,255,255,0.8)', '0 0 20px rgba(255,255,255,0.5)']
-              : '0 0 0px rgba(255,255,255,0)',
           }}
           transition={{ duration: 0.1 }}
         >
           {currentMultiplier.toFixed(2)}x
         </motion.div>
         
-        {/* Multiplier glow */}
         {phase === 'flying' && (
           <motion.div
             className="absolute inset-0 blur-3xl bg-blue-500/30 -z-10"
@@ -208,148 +193,127 @@ export function FlightView({
                      phase === 'crashed' ? '#EF4444' : '#9CA3AF'
             }}
           >
-            {phase === 'waiting' && '⏳ Waiting...'}
-            {phase === 'boarding' && '🎫 Boarding Open'}
-            {phase === 'launching' && '🚀 Ignition!'}
-            {phase === 'flying' && '📈 To The Moon!'}
-            {phase === 'crashed' && '💥 BOOM!'}
+            {phase === 'waiting' && 'WAITING...'}
+            {phase === 'boarding' && 'BOARDING OPEN'}
+            {phase === 'launching' && 'IGNITION!'}
+            {phase === 'flying' && 'CLIMBING!'}
+            {phase === 'crashed' && 'CRASHED!'}
           </motion.div>
         </AnimatePresence>
       </div>
 
       {/* Rocket Container */}
-      <div className="absolute bottom-24 left-1/2 -translate-x-1/2">
+      <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-10">
         <motion.div
           animate={{
             y: getRocketY(),
-            scale: getRocketScale(),
+            scale: phase === 'crashed' ? [1, 0.8, 0] : 1,
+            rotate: phase === 'crashed' ? [0, -15, 15, -10, 10, 0] : [-2, 2, -2],
           }}
           transition={{
             y: { type: 'spring', stiffness: 100, damping: 15 },
-            scale: { duration: 0.2 },
+            scale: { duration: 0.5 },
+            rotate: { duration: phase === 'crashed' ? 0.5 : 0.3, repeat: phase === 'crashed' ? 0 : Infinity },
           }}
           className="relative"
         >
           {/* Rocket */}
-          <div className="relative z-10">
-            <motion.div
-              animate={phase === 'crashed' ? {
-                rotate: [0, -15, 15, -10, 10, 0],
-                scale: [1, 0.8, 0],
-              } : phase === 'flying' || phase === 'launching' ? {
-                rotate: [-2, 2, -2],
-              } : {}}
-              transition={{ duration: phase === 'crashed' ? 0.5 : 0.3, repeat: phase === 'crashed' ? 0 : Infinity }}
-            >
-              <svg width="100" height="140" viewBox="0 0 100 140" className="mx-auto drop-shadow-2xl">
-                <defs>
-                  <linearGradient id="rocketBody" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#3B82F6" />
-                    <stop offset="30%" stopColor="#60A5FA" />
-                    <stop offset="70%" stopColor="#60A5FA" />
-                    <stop offset="100%" stopColor="#3B82F6" />
-                  </linearGradient>
-                  <linearGradient id="rocketWindow" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#1E3A5F" />
-                    <stop offset="100%" stopColor="#60A5FA" />
-                  </linearGradient>
-                </defs>
-                
-                {/* Fins */}
-                <motion.path 
-                  d="M20 80 L0 120 L20 105 Z" 
-                  fill="#DC2626"
-                  animate={phase === 'flying' ? { d: ['M20 80 L0 120 L20 105 Z', 'M20 80 L-5 125 L20 105 Z', 'M20 80 L0 120 L20 105 Z'] } : {}}
-                  transition={{ duration: 0.2, repeat: Infinity }}
-                />
-                <motion.path 
-                  d="M80 80 L100 120 L80 105 Z" 
-                  fill="#DC2626"
-                  animate={phase === 'flying' ? { d: ['M80 80 L100 120 L80 105 Z', 'M80 80 L105 125 L80 105 Z', 'M80 80 L100 120 L80 105 Z'] } : {}}
-                  transition={{ duration: 0.2, repeat: Infinity }}
-                />
-                
-                {/* Body */}
-                <path d="M50 0 L80 50 L80 100 L50 115 L20 100 L20 50 Z" fill="url(#rocketBody)" stroke="#1E40AF" strokeWidth="2" />
-                
-                {/* Window */}
-                <ellipse cx="50" cy="40" rx="18" ry="25" fill="url(#rocketWindow)" />
-                <ellipse cx="45" cy="35" rx="8" ry="12" fill="#60A5FA" opacity="0.6" />
-                
-                {/* Detail lines */}
-                <path d="M20 70 Q50 80 80 70" fill="none" stroke="#1E40AF" strokeWidth="2" opacity="0.5" />
-              </svg>
-            </motion.div>
-
-            {/* Rocket Flame */}
+          <div className="relative">
+            {/* Rocket Flame - positioned BEHIND rocket */}
             <AnimatePresence>
               {(phase === 'launching' || phase === 'flying') && (
                 <motion.div
-                  className="absolute -bottom-12 left-1/2 -translate-x-1/2"
+                  className="absolute"
+                  style={{ 
+                    top: '108px',
+                    left: '0',
+                    right: '0',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    zIndex: 1
+                  }}
                   initial={{ opacity: 0, scale: 0 }}
                   animate={{ 
                     opacity: 1, 
-                    scale: [1, 1.3, 1],
-                    y: [0, 5, 0],
+                    scale: [1, 1.2, 1],
                   }}
                   exit={{ opacity: 0, scale: 0 }}
                   transition={{
                     scale: { duration: 0.1, repeat: Infinity },
-                    y: { duration: 0.05, repeat: Infinity },
                   }}
                 >
-                  <svg width="60" height="90" viewBox="0 0 60 90">
-                    <defs>
-                      <linearGradient id="flame1" x1="50%" y1="100%" x2="50%" y2="0%">
-                        <stop offset="0%" stopColor="#FCD34D" />
-                        <stop offset="40%" stopColor="#F59E0B" />
-                        <stop offset="80%" stopColor="#DC2626" />
-                        <stop offset="100%" stopColor="#7F1D1D" />
-                      </linearGradient>
-                      <linearGradient id="flame2" x1="50%" y1="100%" x2="50%" y2="0%">
-                        <stop offset="0%" stopColor="#60A5FA" />
-                        <stop offset="50%" stopColor="#3B82F6" />
-                        <stop offset="100%" stopColor="#1E40AF" />
-                      </linearGradient>
-                    </defs>
-                    
-                    {/* Outer flame */}
+                  <svg width="50" height="80" viewBox="0 0 50 80">
+                    {/* Outer flame - orange/yellow */}
                     <motion.path
-                      d="M30 0 L45 40 L35 60 L50 85 L30 75 L10 85 L25 60 L15 40 Z"
-                      fill="url(#flame1)"
+                      d="M25 0 L20 20 L15 40 L10 60 L20 50 L25 70 L30 50 L40 60 L35 40 L30 20 Z"
+                      fill="#F59E0B"
+                      stroke="#DC2626"
+                      strokeWidth="1"
                       animate={{ 
                         d: [
-                          'M30 0 L45 40 L35 60 L50 85 L30 75 L10 85 L25 60 L15 40 Z',
-                          'M30 0 L50 45 L40 65 L55 90 L30 80 L5 90 L20 65 L10 45 Z',
-                          'M30 0 L40 35 L30 55 L45 80 L30 70 L15 80 L30 55 L20 35 Z',
-                          'M30 0 L45 40 L35 60 L50 85 L30 75 L10 85 L25 60 L15 40 Z',
-                        ]
-                      }}
-                      transition={{ duration: 0.2, repeat: Infinity }}
-                    />
-                    
-                    {/* Inner flame */}
-                    <motion.path
-                      d="M30 10 L38 35 L32 50 L42 70 L30 65 L18 70 L28 50 L22 35 Z"
-                      fill="url(#flame2)"
-                      animate={{ 
-                        d: [
-                          'M30 10 L38 35 L32 50 L42 70 L30 65 L18 70 L28 50 L22 35 Z',
-                          'M30 10 L42 40 L36 55 L46 75 L30 70 L14 75 L24 55 L18 40 Z',
-                          'M30 10 L35 30 L30 45 L40 65 L30 60 L20 65 L30 45 L25 30 Z',
-                          'M30 10 L38 35 L32 50 L42 70 L30 65 L18 70 L28 50 L22 35 Z',
+                          'M25 0 L20 20 L15 40 L10 60 L20 50 L25 70 L30 50 L40 60 L35 40 L30 20 Z',
+                          'M25 0 L18 22 L12 42 L8 65 L18 52 L25 75 L32 52 L42 65 L38 42 L32 22 Z',
+                          'M25 0 L22 18 L18 38 L12 58 L22 48 L25 68 L28 48 L38 58 L32 38 L28 18 Z',
+                          'M25 0 L20 20 L15 40 L10 60 L20 50 L25 70 L30 50 L40 60 L35 40 L30 20 Z',
                         ]
                       }}
                       transition={{ duration: 0.15, repeat: Infinity }}
+                    />
+                    
+                    {/* Inner flame - blue */}
+                    <motion.path
+                      d="M25 5 L22 20 L18 35 L15 50 L22 42 L25 55 L28 42 L35 50 L32 35 L28 20 Z"
+                      fill="#3B82F6"
+                      stroke="#1E40AF"
+                      strokeWidth="1"
+                      animate={{ 
+                        d: [
+                          'M25 5 L22 20 L18 35 L15 50 L22 42 L25 55 L28 42 L35 50 L32 35 L28 20 Z',
+                          'M25 5 L20 22 L16 38 L12 52 L20 45 L25 58 L30 45 L38 52 L34 38 L30 22 Z',
+                          'M25 5 L24 18 L20 32 L18 48 L24 40 L25 52 L26 40 L32 48 L30 32 L26 18 Z',
+                          'M25 5 L22 20 L18 35 L15 50 L22 42 L25 55 L28 42 L35 50 L32 35 L28 20 Z',
+                        ]
+                      }}
+                      transition={{ duration: 0.12, repeat: Infinity }}
                     />
                   </svg>
                 </motion.div>
               )}
             </AnimatePresence>
+
+            <svg width="100" height="140" viewBox="0 0 100 140" className="mx-auto relative" style={{ zIndex: 2, position: 'relative' }}>
+              {/* Fins - red */}
+              <motion.path 
+                d="M20 80 L0 120 L20 105 Z" 
+                fill="#DC2626"
+                stroke="#8B0000"
+                strokeWidth="1"
+                animate={phase === 'flying' ? { d: ['M20 80 L0 120 L20 105 Z', 'M20 80 L-5 125 L20 105 Z', 'M20 80 L0 120 L20 105 Z'] } : {}}
+                transition={{ duration: 0.2, repeat: Infinity }}
+              />
+              <motion.path 
+                d="M80 80 L100 120 L80 105 Z" 
+                fill="#DC2626"
+                stroke="#8B0000"
+                strokeWidth="1"
+                animate={phase === 'flying' ? { d: ['M80 80 L100 120 L80 105 Z', 'M80 80 L105 125 L80 105 Z', 'M80 80 L100 120 L80 105 Z'] } : {}}
+                transition={{ duration: 0.2, repeat: Infinity }}
+              />
+              
+              {/* Body - solid blue */}
+              <path d="M50 0 L80 50 L80 100 L50 115 L20 100 L20 50 Z" fill="#3B82F6" stroke="#1E40AF" strokeWidth="2" />
+              
+              {/* Window - solid dark blue */}
+              <ellipse cx="50" cy="40" rx="18" ry="25" fill="#1E3A5F" stroke="#60A5FA" strokeWidth="2" />
+              <ellipse cx="45" cy="35" rx="8" ry="12" fill="#60A5FA" opacity="0.6" />
+              
+              {/* Detail lines */}
+              <path d="M20 70 Q50 80 80 70" fill="none" stroke="#1E40AF" strokeWidth="2" opacity="0.5" />
+            </svg>
           </div>
 
           {/* Passengers in rocket windows */}
-          <div className="absolute top-8 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-0.5 w-20">
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-0.5 w-20">
             <AnimatePresence>
               {flyingPassengers.map((ap, i) => (
                 <motion.div
@@ -362,7 +326,7 @@ export function FlightView({
                     type: 'spring',
                     stiffness: 200,
                   }}
-                  className="text-lg filter drop-shadow-lg"
+                  className="text-lg"
                   style={{ 
                     position: 'absolute', 
                     left: `${(i % 3) * 22 + 10}px`, 
@@ -401,7 +365,6 @@ export function FlightView({
             }}
           >
             <div className="flex flex-col items-center">
-              {/* Parachute */}
               <motion.svg 
                 width="40" height="30" viewBox="0 0 40 30"
                 animate={{ 
@@ -421,10 +384,8 @@ export function FlightView({
                 <line x1="30" y1="20" x2="20" y2="25" stroke="#15803D" strokeWidth="1" />
               </motion.svg>
               
-              {/* Agent */}
-              <div className="text-3xl filter drop-shadow-lg">{ap.avatar.emoji}</div>
+              <div className="text-3xl">{ap.avatar.emoji}</div>
               
-              {/* Eject multiplier badge */}
               <motion.div 
                 className="text-xs text-green-400 font-black bg-black/80 px-2 py-1 rounded-full border border-green-500/50 mt-1"
                 initial={{ scale: 0 }}
@@ -448,7 +409,6 @@ export function FlightView({
             className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50"
           >
             <svg width="400" height="400" viewBox="0 0 400 400">
-              {/* Main explosion */}
               <motion.circle
                 cx="200"
                 cy="200"
@@ -474,7 +434,6 @@ export function FlightView({
                 transition={{ duration: 0.4, delay: 0.05 }}
               />
               
-              {/* Explosion rays */}
               {Array.from({ length: 12 }).map((_, i) => {
                 const angle = (i * 30 * Math.PI) / 180;
                 return (
@@ -499,7 +458,6 @@ export function FlightView({
               })}
             </svg>
             
-            {/* Particle effects */}
             {particles.map((p) => (
               <motion.div
                 key={p.id}
@@ -530,18 +488,10 @@ export function FlightView({
             className="absolute top-1/4 left-1/2 -translate-x-1/2 text-center z-40"
           >
             <motion.div 
-              className="text-6xl font-black text-red-500 drop-shadow-2xl"
+              className="text-5xl font-black text-red-500"
               style={{ textShadow: '0 0 30px rgba(239, 68, 68, 0.8)' }}
-              animate={{ 
-                textShadow: [
-                  '0 0 30px rgba(239, 68, 68, 0.8)',
-                  '0 0 60px rgba(239, 68, 68, 1)',
-                  '0 0 30px rgba(239, 68, 68, 0.8)',
-                ]
-              }}
-              transition={{ duration: 0.5, repeat: Infinity }}
             >
-              CRASHED!
+              {['KABOOM!', 'BLAM!', 'POW!', 'CRASH!', 'BOOM!', 'SPLAT!'][Math.floor(Math.random() * 6)]}
             </motion.div>
             <motion.div 
               className="text-red-400 text-xl mt-2 font-bold"

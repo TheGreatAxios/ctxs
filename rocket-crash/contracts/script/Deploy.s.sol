@@ -6,14 +6,12 @@ import "../src/Rocket.sol";
 
 contract DeployScript is Script {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        
-        vm.startBroadcast(deployerPrivateKey);
-        
+        vm.startBroadcast();
+
         RocketGame rocket = new RocketGame();
-        
+
         console.log("RocketGame deployed at:", address(rocket));
-        
+
         vm.stopBroadcast();
     }
 }
