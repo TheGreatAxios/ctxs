@@ -1,0 +1,2 @@
+[submodules]
+openzeppelin-contracts = { url = "https://github.com/OpenZeppelin/openzeppelin-contracts.git", rev = "v4.9.3" }
