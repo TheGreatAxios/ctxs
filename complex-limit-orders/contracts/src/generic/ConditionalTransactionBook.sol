@@ -1,7 +1,7 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "../encryption/BITEPrecompile.sol";
+import { Precompiled } from "../encryption/Precompiled.sol";
 import "../conditions/IConditionChecker.sol";
 import "../conditions/ConditionTypes.sol";
 import "../actions/IActionExecutor.sol";
@@ -262,8 +262,7 @@ contract ConditionalTransactionBook is ReentrancyGuard {
 
         // Submit CTX
         uint256 batchGasLimit = 500_000 * count + 100_000;
-        (address ctxSender, bool ctxSuccess) = BITEPrecompile.submitCTX(encryptedArgs, plaintextArgs, batchGasLimit);
-        if (!ctxSuccess) return 0;
+        address payable ctxSender = Precompiled.submitCTX(address(0x1B), batchGasLimit, abi.encode(encryptedArgs), abi.encode(plaintextArgs));
 
         // Fund CTX sender
         _fundCtxTxs(txs, indicesToProcess, count, ctxSender);

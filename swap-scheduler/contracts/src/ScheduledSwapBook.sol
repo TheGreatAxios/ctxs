@@ -2,7 +2,7 @@ pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./amm/interfaces/IBiteSwapV2Pair.sol";
-import "./encryption/BITEPrecompile.sol";
+import { Precompiled } from "./encryption/Precompiled.sol";
 
 /// @notice ScheduledSwapBook - Price-triggered AMM swap scheduler using BITE threshold encryption
 contract ScheduledSwapBook {
@@ -173,7 +173,7 @@ contract ScheduledSwapBook {
         bytes[] memory plaintextArgs = new bytes[](1);
         plaintextArgs[0] = plaintextData;
 
-        address ctxSender = BITEPrecompile.submitCTX(encryptedArgs, plaintextArgs, CTX_GAS_LIMIT);
+        address payable ctxSender = Precompiled.submitCTX(address(0x1B), CTX_GAS_LIMIT, abi.encode(encryptedArgs), abi.encode(plaintextArgs));
 
         // Track CTX sender for access control
         isCtxSender[ctxSender] = true;
