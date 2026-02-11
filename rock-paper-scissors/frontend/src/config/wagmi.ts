@@ -3,15 +3,15 @@ import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors'
 
 // SKALE BITE V2 Sandbox
 export const skaleTestnetChain = {
-  id: 2090472038,
+  id: 103698795,
   name: 'SKALE BITE V2 Sandbox',
   nativeCurrency: { name: 'sFUEL', symbol: 'sFUEL', decimals: 18 },
   rpcUrls: {
     public: {
-      http: ['https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox'],
+      http: ['https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox-2'],
     },
     default: {
-      http: ['https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox'],
+      http: ['https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox-2'],
     },
   },
   blockExplorers: {
@@ -41,7 +41,7 @@ export const config = createConfig({
     }),
   ],
   transports: {
-    [skaleTestnetChain.id]: http('https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox'),
+    [skaleTestnetChain.id]: http('https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox-2'),
   },
   ssr: true,
 })

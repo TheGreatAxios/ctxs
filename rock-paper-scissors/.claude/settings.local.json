@@ -6,7 +6,9 @@
       "Bash(forge build:*)",
       "Bash(forge clean:*)",
       "mcp__web-reader__webReader",
-      "Bash(bun add:*)"
+      "Bash(bun add:*)",
+      "WebSearch",
+      "mcp__web-search-prime__webSearchPrime"
     ]
   }
 }

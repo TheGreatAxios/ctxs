@@ -32,6 +32,7 @@ contract RockPaperScissors is ReentrancyGuard {
 
     uint256 public constant JOIN_TIMEOUT = 1 hours;
     uint256 public constant CTX_GAS_LIMIT = 300000;
+    uint256 public constant CTX_GAS_PAYMENT = 0.06 ether; // 0.06 ETH for CTX gas
 
     mapping(uint256 => Game) public games;
     uint256 public nextGameId;
@@ -46,18 +47,14 @@ contract RockPaperScissors is ReentrancyGuard {
 
     function createGame(bytes calldata _encryptedMove, uint256 _wagerAmount, address _wagerToken)
         external
-        payable
         nonReentrant
         returns (uint256 gameId)
     {
         require(_encryptedMove.length > 0, "Invalid encrypted move");
+        require(_wagerToken != address(0), "Must use ERC20 token");
 
-        if (_wagerToken == address(0)) {
-            require(msg.value == _wagerAmount, "ETH mismatch");
-        } else {
-            require(msg.value == 0, "No ETH for ERC20");
-            IERC20(_wagerToken).safeTransferFrom(msg.sender, address(this), _wagerAmount);
-        }
+        // Transfer wager tokens from player to contract
+        IERC20(_wagerToken).safeTransferFrom(msg.sender, address(this), _wagerAmount);
 
         gameId = nextGameId++;
         games[gameId] = Game({
@@ -88,13 +85,10 @@ contract RockPaperScissors is ReentrancyGuard {
         require(game.state == GameState.Created, "Invalid state");
         require(block.timestamp <= game.joinDeadline, "Expired");
         require(_encryptedMove.length > 0, "Invalid encrypted move");
+        require(msg.value == CTX_GAS_PAYMENT, "Invalid CTX gas payment");
 
-        if (game.wagerToken == address(0)) {
-            require(msg.value == game.wagerAmount, "ETH mismatch");
-        } else {
-            require(msg.value == 0, "No ETH for ERC20");
-            IERC20(game.wagerToken).safeTransferFrom(msg.sender, address(this), game.wagerAmount);
-        }
+        // Transfer wager tokens from player to contract
+        IERC20(game.wagerToken).safeTransferFrom(msg.sender, address(this), game.wagerAmount);
 
         game.player2 = msg.sender;
         game.encryptedMove2 = _encryptedMove;
@@ -118,7 +112,7 @@ contract RockPaperScissors is ReentrancyGuard {
         bytes[] memory plaintextArgs = new bytes[](1);
         plaintextArgs[0] = abi.encode(_gameId);
 
-        // Get CTX sender address to top up
+        // Get CTX sender address and transfer gas payment
         address payable ctxSender = Precompiled.submitCTX(
             SUBMIT_CTX,
             CTX_GAS_LIMIT,
@@ -126,11 +120,8 @@ contract RockPaperScissors is ReentrancyGuard {
             abi.encode(plaintextArgs)
         );
 
-        // Transfer ETH to CTX sender for gas
-        uint256 gasCost = CTX_GAS_LIMIT * tx.gasprice;
-        if (gasCost > 0) {
-            payable(ctxSender).transfer(gasCost);
-        }
+        // Transfer gas payment to CTX sender
+        payable(ctxSender).transfer(CTX_GAS_PAYMENT);
     }
 
     function onDecrypt(bytes[] calldata decryptedArguments, bytes[] calldata plaintextArguments)
@@ -202,26 +193,18 @@ contract RockPaperScissors is ReentrancyGuard {
     }
 
     function _transferPayout(address _to, uint256 _amount, address _token) internal {
-        if (_token == address(0)) {
-            payable(_to).transfer(_amount);
-        } else {
-            IERC20(_token).safeTransfer(_to, _amount);
-        }
+        IERC20(_token).safeTransfer(_to, _amount);
     }
 
     function _refundPlayer(address _player, uint256 _amount, address _token) internal {
-        if (_token == address(0)) {
-            payable(_player).transfer(_amount);
-        } else {
-            IERC20(_token).safeTransfer(_player, _amount);
-        }
+        IERC20(_token).safeTransfer(_player, _amount);
     }
 
     function getGame(uint256 _gameId) external view returns (Game memory) {
         return games[_gameId];
     }
 
-    // Allow contract to receive ETH for CTX gas
+    // Allow contract to receive ETH for CTX gas payments
     receive() external payable {}
     fallback() external payable {}
 }

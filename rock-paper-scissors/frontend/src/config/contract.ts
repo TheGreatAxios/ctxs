@@ -7,7 +7,7 @@ export const CONTRACT_ABI = [
     ],
     "name": "createGame",
     "outputs": [{ "internalType": "uint256", "name": "gameId", "type": "uint256" }],
-    "stateMutability": "payable",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -92,12 +92,12 @@ export const ERC20_ABI = [
 ] as const
 
 export const CONTRACT_ADDRESS = {
-  2090472038: '0x9be779b1136e1f5f75edeb0469b74921c39f5167',
+  103698795: '0x2d7382cAB1e03c495d021d3Be7041f4837B887C0',
 } as const
 
 // Mock SKL Token
 export const TOKEN_ADDRESS = {
-  2090472038: '0x8d4d0c04f45652dfc3ac95f9f0d4116bc0620f4f',
+  103698795: '0xD2B09f3953842DcC7726eEA3dabC5032a28acF8E',
 } as const
 
 export const TOKEN_DECIMALS = 18
