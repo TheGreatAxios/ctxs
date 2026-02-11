@@ -78,10 +78,10 @@ contract DeployEverything is Script {
         // Mint to each recipient
         for (uint256 i = 0; i < recipients.length; i++) {
             // Increased mint amounts for higher liquidity per pool (80M TVL per pool)
-            MockToken(config.usdc).mint(recipients[i], 200_000_000 * 10 ** 6);  // 200M USDC
-            MockToken(config.usdt).mint(recipients[i], 200_000_000 * 10 ** 6);  // 200M USDT
-            MockToken(config.weth).mint(recipients[i], 80_000 * 10 ** 18);        // 80K WETH (~240M)
-            MockToken(config.wbtc).mint(recipients[i], 2_000 * 10 ** 8);          // 2K WBTC (~200M)
+            MockToken(config.usdc).mint(recipients[i], 200_000_000 * 10 ** 6); // 200M USDC
+            MockToken(config.usdt).mint(recipients[i], 200_000_000 * 10 ** 6); // 200M USDT
+            MockToken(config.weth).mint(recipients[i], 80_000 * 10 ** 18); // 80K WETH (~240M)
+            MockToken(config.wbtc).mint(recipients[i], 2_000 * 10 ** 8); // 2K WBTC (~200M)
 
             console.log("Minted tokens to:", recipients[i]);
         }

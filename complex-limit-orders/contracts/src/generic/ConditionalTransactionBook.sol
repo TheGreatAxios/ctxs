@@ -1,7 +1,7 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import { Precompiled } from "../encryption/Precompiled.sol";
+import {Precompiled} from "../encryption/Precompiled.sol";
 import "../conditions/IConditionChecker.sol";
 import "../conditions/ConditionTypes.sol";
 import "../actions/IActionExecutor.sol";
@@ -262,7 +262,8 @@ contract ConditionalTransactionBook is ReentrancyGuard {
 
         // Submit CTX
         uint256 batchGasLimit = 500_000 * count + 100_000;
-        address payable ctxSender = Precompiled.submitCTX(address(0x1B), batchGasLimit, abi.encode(encryptedArgs), abi.encode(plaintextArgs));
+        address payable ctxSender =
+            Precompiled.submitCTX(address(0x1B), batchGasLimit, abi.encode(encryptedArgs), abi.encode(plaintextArgs));
 
         // Fund CTX sender
         _fundCtxTxs(txs, indicesToProcess, count, ctxSender);
@@ -276,12 +277,16 @@ contract ConditionalTransactionBook is ReentrancyGuard {
         ConditionalTx[] storage txs,
         uint256[] memory txIndices,
         uint256 indicesCount
-    ) internal view returns (
-        bytes[] memory encryptedArgs,
-        bytes[] memory plaintextArgs,
-        uint256[] memory indicesToProcess,
-        uint256 count
-    ) {
+    )
+        internal
+        view
+        returns (
+            bytes[] memory encryptedArgs,
+            bytes[] memory plaintextArgs,
+            uint256[] memory indicesToProcess,
+            uint256 count
+        )
+    {
         encryptedArgs = new bytes[](indicesCount);
         plaintextArgs = new bytes[](indicesCount * 4);
         indicesToProcess = new uint256[](indicesCount);
@@ -292,7 +297,9 @@ contract ConditionalTransactionBook is ReentrancyGuard {
             ConditionalTx storage ctx = txs[txIdx];
 
             if (!_canProcessTx(ctx)) {
-                unchecked { ++i; }
+                unchecked {
+                    ++i;
+                }
                 continue;
             }
 
@@ -304,7 +311,10 @@ contract ConditionalTransactionBook is ReentrancyGuard {
             plaintextArgs[pos * 4 + 3] = abi.encode(ctx.nonce);
             indicesToProcess[pos] = txIdx;
 
-            unchecked { ++count; ++i; }
+            unchecked {
+                ++count;
+                ++i;
+            }
         }
     }
 
@@ -331,7 +341,9 @@ contract ConditionalTransactionBook is ReentrancyGuard {
                 ctx.ctxProcessing = false;
                 revert TransferFailed();
             }
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -346,7 +358,9 @@ contract ConditionalTransactionBook is ReentrancyGuard {
 
         for (uint256 i = 0; i < txCount;) {
             _processSingleCtx(decryptedArgs, plainArgs, i);
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
     }
 

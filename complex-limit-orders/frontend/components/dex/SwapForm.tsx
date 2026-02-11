@@ -1,22 +1,30 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useEffect } from 'react';
-import { useAccount, useBalance, useReadContract, useSwitchChain } from 'wagmi';
-import { useQueryClient } from '@tanstack/react-query';
-import { useConnectModal } from '@rainbow-me/rainbowkit';
-import { ArrowDownUp, AlertCircle, Settings, Zap, DollarSign, Eye, EyeOff } from 'lucide-react';
-import { cn, formatBigInt, parseBigInt } from '@/lib/utils';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { TokenSelector } from '@/components/dex/TokenSelector';
-import { type TokenInfo } from '@/context/TokenBalancesContext';
-import { useSwap, useApprove, calculateAmountOut } from '@/lib/hooks/useSwap';
-import { useTokenAllowance, useReserves } from '@/lib/hooks/useContractRead';
-import { useTokenPriceByAddress } from '@/lib/hooks/useTokenPrices';
-import { useRoute } from '@/lib/hooks/useRoute';
-import { useSwapAmounts } from '@/context/SwapAmountsContext';
-import { CHAIN_ID } from '@/config/index';
-import BiteSwapV2PairABI from '../../abi/BiteSwapV2Pair.json';
+import { useState, useMemo, useEffect } from "react";
+import { useAccount, useBalance, useReadContract, useSwitchChain } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import {
+  ArrowDownUp,
+  AlertCircle,
+  Settings,
+  Zap,
+  DollarSign,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { cn, formatBigInt, parseBigInt } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { TokenSelector } from "@/components/dex/TokenSelector";
+import { type TokenInfo } from "@/context/TokenBalancesContext";
+import { useSwap, useApprove, calculateAmountOut } from "@/lib/hooks/useSwap";
+import { useTokenAllowance, useReserves } from "@/lib/hooks/useContractRead";
+import { useTokenPriceByAddress } from "@/lib/hooks/useTokenPrices";
+import { useRoute } from "@/lib/hooks/useRoute";
+import { useSwapAmounts } from "@/context/SwapAmountsContext";
+import { CHAIN_ID, getTokenInfo } from "@/config/index";
+import BiteSwapV2PairABI from "../../abi/BiteSwapV2Pair.json";
 
 const DEADLINE_MINUTES = 20;
 const TARGET_CHAIN_ID = CHAIN_ID;
@@ -28,40 +36,67 @@ interface SwapFormProps {
 }
 
 // Safe number formatter to handle NaN
-const safeFixed = (value: number | null | undefined, decimals: number): string => {
-  if (value === null || value === undefined || isNaN(value)) return '---';
+const safeFixed = (
+  value: number | null | undefined,
+  decimals: number,
+): string => {
+  if (value === null || value === undefined || isNaN(value)) return "---";
   return value.toFixed(decimals);
 };
 
-export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }: SwapFormProps) {
+export function SwapForm({
+  factoryAddress,
+  routerAddress,
+  availableTokens = [],
+}: SwapFormProps) {
   const { address, chain, isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
   const { switchChain } = useSwitchChain();
-  const { amounts: cachedAmounts, setAmounts: setCachedAmounts } = useSwapAmounts();
+  const { amounts: cachedAmounts, setAmounts: setCachedAmounts } =
+    useSwapAmounts();
   const [fromToken, setFromToken] = useState<TokenInfo | null>(null);
   const [toToken, setToToken] = useState<TokenInfo | null>(null);
-  const [slippage, setSlippage] = useState('0.1');
+  const [slippage, setSlippage] = useState("0.1");
   const [showSlippageSettings, setShowSlippageSettings] = useState(false);
   const [useEncryption, setUseEncryption] = useState(true); // Default: BITE encrypted
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
-  const [processedReceiptHash, setProcessedReceiptHash] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<"from" | "to" | null>(null);
+  const [processedReceiptHash, setProcessedReceiptHash] = useState<
+    string | null
+  >(null);
 
-  const { swap, isPending: swapPending, isConfirming, receipt: swapReceipt, error: swapError, clearError: clearSwapError } = useSwap();
+  const {
+    swap,
+    isPending: swapPending,
+    isConfirming,
+    receipt: swapReceipt,
+    error: swapError,
+    clearError: clearSwapError,
+  } = useSwap();
   const queryClient = useQueryClient();
-  const { approve: approveToken, isPending: approvePending, error: approveError, clearError: clearApproveError, receipt: approveReceipt } = useApprove();
+  const {
+    approve: approveToken,
+    isPending: approvePending,
+    error: approveError,
+    clearError: clearApproveError,
+    receipt: approveReceipt,
+  } = useApprove();
 
   const amountInForRoute = useMemo(() => {
     if (!cachedAmounts.fromAmount || !fromToken) return undefined;
     return parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18);
   }, [cachedAmounts.fromAmount, fromToken]);
 
-  const { route, isLoading: isLoadingRoute } = useRoute(
+  const {
+    route,
+    isLoading: isLoadingRoute,
+    error: routeError,
+  } = useRoute(
     factoryAddress,
     fromToken?.address,
     toToken?.address,
-    amountInForRoute
+    amountInForRoute,
   );
 
   const pairAddress = useMemo(() => {
@@ -97,9 +132,9 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
   }, [cachedAmounts.toAmount, toUsdPrice]);
 
   const { data: allowanceRaw, refetch: refetchAllowance } = useTokenAllowance(
-    fromToken?.address ?? '0x0000000000000000000000000000000000000001',
-    address ?? '0x0000000000000000000000000000000000000001',
-    routerAddress ?? '0x0000000000000000000000000000000000000001'
+    fromToken?.address ?? "0x0000000000000000000000000000000000000001",
+    address ?? "0x0000000000000000000000000000000000000001",
+    routerAddress ?? "0x0000000000000000000000000000000000000001",
   );
 
   const allowance = allowanceRaw as bigint | undefined;
@@ -120,32 +155,57 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
   }, []);
 
   const needsApproval = useMemo(() => {
-    if (!cachedAmounts.fromAmount || !fromToken || allowance === undefined || !routerAddress) return false;
-    const amountIn = parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18);
+    if (
+      !cachedAmounts.fromAmount ||
+      !fromToken ||
+      allowance === undefined ||
+      !routerAddress
+    )
+      return false;
+    const amountIn = parseBigInt(
+      cachedAmounts.fromAmount,
+      fromToken.decimals ?? 18,
+    );
     const needs = allowance < amountIn;
-    console.log("needsApproval check:", { allowance: allowance.toString(), amountIn: amountIn.toString(), needs, fromToken: fromToken.symbol });
+    console.log("needsApproval check:", {
+      allowance: allowance.toString(),
+      amountIn: amountIn.toString(),
+      needs,
+      fromToken: fromToken.symbol,
+    });
     return needs;
   }, [cachedAmounts.fromAmount, fromToken, allowance, routerAddress]);
 
   useEffect(() => {
-    if (editingField === 'from') {
+    if (editingField === "from") {
       if (calculatedOutput && toToken) {
-        setCachedAmounts({ toAmount: formatBigInt(calculatedOutput, toToken.decimals ?? 18) });
+        setCachedAmounts({
+          toAmount: formatBigInt(calculatedOutput, toToken.decimals ?? 18),
+        });
       }
       // Only clear toAmount if editing from and no output (not during token changes)
       else if (fromToken && toToken) {
-        setCachedAmounts({ toAmount: '' });
+        setCachedAmounts({ toAmount: "" });
       }
-    } else if (editingField === 'to') {
+    } else if (editingField === "to") {
       if (calculatedInput && fromToken) {
-        setCachedAmounts({ fromAmount: formatBigInt(calculatedInput, fromToken.decimals ?? 18) });
+        setCachedAmounts({
+          fromAmount: formatBigInt(calculatedInput, fromToken.decimals ?? 18),
+        });
       }
       // Only clear fromAmount if editing to and no input (not during token changes)
       else if (fromToken && toToken) {
-        setCachedAmounts({ fromAmount: '' });
+        setCachedAmounts({ fromAmount: "" });
       }
     }
-  }, [calculatedOutput, calculatedInput, toToken, fromToken, editingField, setCachedAmounts]);
+  }, [
+    calculatedOutput,
+    calculatedInput,
+    toToken,
+    fromToken,
+    editingField,
+    setCachedAmounts,
+  ]);
 
   // Update error from hooks
   useEffect(() => {
@@ -192,7 +252,7 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
       refetchFromBalance();
       if (toToken?.address && address) {
         queryClient.invalidateQueries({
-          queryKey: ['balance', address, toToken.address],
+          queryKey: ["balance", address, toToken.address],
         });
       }
 
@@ -200,14 +260,16 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
       refetchAllowance();
 
       // Clear form amounts after successful swap
-      setCachedAmounts({ fromAmount: '', toAmount: '' });
+      setCachedAmounts({ fromAmount: "", toAmount: "" });
 
       // Clear any existing error
       setError(null);
 
       // Show success message
       if (fromAmount && toAmount && fromSymbol && toSymbol) {
-        setSuccessMessage(`Swapped ${fromAmount} ${fromSymbol} for ${toAmount} ${toSymbol}`);
+        setSuccessMessage(
+          `Swapped ${fromAmount} ${fromSymbol} for ${toAmount} ${toSymbol}`,
+        );
       }
 
       // Auto-hide success message after 5 seconds
@@ -218,7 +280,18 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
       console.log("Swap complete - all data refetched");
       return () => clearTimeout(timer);
     }
-  }, [swapReceipt, toToken, fromToken, address, queryClient, refetchFromBalance, refetchAllowance, setCachedAmounts, cachedAmounts, processedReceiptHash]);
+  }, [
+    swapReceipt,
+    toToken,
+    fromToken,
+    address,
+    queryClient,
+    refetchFromBalance,
+    refetchAllowance,
+    setCachedAmounts,
+    cachedAmounts,
+    processedReceiptHash,
+  ]);
 
   const handleSwapTokens = () => {
     setFromToken(toToken);
@@ -237,12 +310,18 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
   };
 
   const validateSwap = () => {
-    if (!address) return 'Please connect your wallet';
-    if (!fromToken || !toToken) return 'Please select both tokens';
-    if (!cachedAmounts.fromAmount || parseFloat(cachedAmounts.fromAmount) <= 0) return 'Enter an amount';
-    if (fromToken?.address === toToken?.address) return 'Cannot swap same token';
-    if (!routerAddress || routerAddress === '0x0000000000000000000000000000000000000000') return 'Router not configured';
-    if (!route) return 'No route found';
+    if (!address) return "Please connect your wallet";
+    if (!fromToken || !toToken) return "Please select both tokens";
+    if (!cachedAmounts.fromAmount || parseFloat(cachedAmounts.fromAmount) <= 0)
+      return "Enter an amount";
+    if (fromToken?.address === toToken?.address)
+      return "Cannot swap same token";
+    if (
+      !routerAddress ||
+      routerAddress === "0x0000000000000000000000000000000000000000"
+    )
+      return "Router not configured";
+    if (!route) return "No route found";
     return null;
   };
 
@@ -254,13 +333,16 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
     }
 
     if (!fromToken || !routerAddress) {
-      setError('Router address missing');
+      setError("Router address missing");
       return;
     }
 
     setError(null);
     clearSwapError();
-    const amountIn = parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18);
+    const amountIn = parseBigInt(
+      cachedAmounts.fromAmount,
+      fromToken.decimals ?? 18,
+    );
     await approveToken(fromToken.address, routerAddress, amountIn);
     // Refetch immediately (optimistic) - will be refetched again when receipt confirms
     setTimeout(() => refetchAllowance(), 1000);
@@ -279,11 +361,15 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
     setSuccessMessage(null);
     setProcessedReceiptHash(null); // Clear processed hash for new swap
     clearApproveError();
-    const amountIn = parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18);
+    const amountIn = parseBigInt(
+      cachedAmounts.fromAmount,
+      fromToken.decimals ?? 18,
+    );
     // Use the slippage state value (e.g., "0.1" = 0.1%, "1" = 1%)
     const slippageDecimal = Number.parseFloat(slippage) / 100;
     const amountOutMin = calculatedOutput
-      ? (calculatedOutput * BigInt(Math.floor((1 - slippageDecimal) * 10000))) / BigInt(10000)
+      ? (calculatedOutput * BigInt(Math.floor((1 - slippageDecimal) * 10000))) /
+        BigInt(10000)
       : BigInt(0);
 
     await swap({
@@ -314,17 +400,14 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
           onClick={handleGetStarted}
           className="w-full !h-11 text-sm font-extrabold uppercase"
         >
-          {isWrongChain ? 'Switch Network' : 'Get Started'}
+          {isWrongChain ? "Switch Network" : "Get Started"}
         </Button>
       );
     }
     // Only show loading when there's an amount being routed
     if (isLoadingRoute && amountInForRoute) {
       return (
-        <Button
-          disabled
-          className="w-full !h-11 text-sm"
-        >
+        <Button disabled className="w-full !h-11 text-sm">
           Loading...
         </Button>
       );
@@ -345,10 +428,16 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
       <Button
         onClick={handleSwap}
         isLoading={swapPending || isConfirming}
-        disabled={!cachedAmounts.fromAmount || !cachedAmounts.toAmount || !routerAddress}
+        disabled={
+          !cachedAmounts.fromAmount || !cachedAmounts.toAmount || !routerAddress
+        }
         className="w-full !h-11 text-sm font-extrabold uppercase"
       >
-        {isConfirming ? 'Confirming...' : swapPending ? 'Swapping...' : (
+        {isConfirming ? (
+          "Confirming..."
+        ) : swapPending ? (
+          "Swapping..."
+        ) : (
           <span className="flex items-center gap-1.5">
             <Zap className="h-4 w-4" />
             Swap
@@ -358,7 +447,8 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
     );
   };
 
-  const hasNoRoute = fromToken && toToken && amountInForRoute && !isLoadingRoute && !route;
+  const hasNoRoute =
+    fromToken && toToken && amountInForRoute && !isLoadingRoute && routeError;
 
   return (
     <div className="flex w-full max-w-md flex-col gap-3 bg-white border-3 border-solid border-black rounded-2xl p-5 brutalist-shadow-lg">
@@ -376,11 +466,17 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
               "flex items-center gap-1.5 rounded-lg border-2 border-solid px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-all hover:translate-y-0.5 active:translate-y-[3px]",
               useEncryption
                 ? "bg-primary text-primary-foreground border-primary brutalist-shadow-sm hover:shadow-[1px_1px_0_0_#000]"
-                : "bg-stone-100 text-stone-900 border-black hover:bg-stone-200 brutalist-shadow-sm hover:shadow-[1px_1px_0_0_#000]"
+                : "bg-stone-100 text-stone-900 border-black hover:bg-stone-200 brutalist-shadow-sm hover:shadow-[1px_1px_0_0_#000]",
             )}
-            title={useEncryption ? "BITE Encrypted (on)" : "Not Encrypted (off)"}
+            title={
+              useEncryption ? "BITE Encrypted (on)" : "Not Encrypted (off)"
+            }
           >
-            {useEncryption ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            {useEncryption ? (
+              <Eye className="h-3.5 w-3.5" />
+            ) : (
+              <EyeOff className="h-3.5 w-3.5" />
+            )}
           </button>
           {/* Slippage Settings */}
           <button
@@ -410,7 +506,7 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
                   "rounded-lg border-2 border-solid py-2 px-3 text-xs font-extrabold uppercase tracking-wide transition-all flex items-center justify-center gap-1.5",
                   useEncryption
                     ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-white text-stone-900 border-black hover:bg-stone-200"
+                    : "bg-white text-stone-900 border-black hover:bg-stone-200",
                 )}
               >
                 <Eye className="h-3.5 w-3.5" />
@@ -423,7 +519,7 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
                   "rounded-lg border-2 border-solid py-2 px-3 text-xs font-extrabold uppercase tracking-wide transition-all flex items-center justify-center gap-1.5",
                   !useEncryption
                     ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-white text-stone-900 border-black hover:bg-stone-200"
+                    : "bg-white text-stone-900 border-black hover:bg-stone-200",
                 )}
               >
                 <EyeOff className="h-3.5 w-3.5" />
@@ -431,7 +527,9 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
               </button>
             </div>
             <p className="text-[9px] text-stone-500 font-medium">
-              {useEncryption ? "BITE threshold encryption enabled" : "Standard DEX swap (no encryption)"}
+              {useEncryption
+                ? "BITE threshold encryption enabled"
+                : "Standard DEX swap (no encryption)"}
             </p>
           </div>
 
@@ -453,7 +551,7 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
                     "flex-1 rounded-lg border-2 border-solid py-2 text-xs font-extrabold uppercase tracking-wide transition-all",
                     slippage === preset.toString()
                       ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-white text-stone-900 border-black hover:bg-stone-200 brutalist-shadow-sm"
+                      : "bg-white text-stone-900 border-black hover:bg-stone-200 brutalist-shadow-sm",
                   )}
                 >
                   {preset}%
@@ -470,7 +568,8 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-warning shrink-0" />
             <span className="font-extrabold uppercase tracking-wide text-stone-900">
-              No route found for {fromToken.symbol} → {toToken.symbol}
+              {routeError ||
+                `No route found for ${fromToken?.symbol} → ${toToken?.symbol}`}
             </span>
           </div>
         </div>
@@ -484,7 +583,11 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
               Route: {route.hops} hops
             </span>
             <span className="font-bold text-stone-600">
-              {fromToken.symbol} → {route.hops === 2 ? '→ ' : ''}{toToken.symbol}
+              {fromToken.symbol} →{" "}
+              {route.intermediary
+                ? `${getTokenInfo(route.intermediary)?.symbol || "..."} → `
+                : ""}
+              {toToken.symbol}
             </span>
           </div>
         </div>
@@ -520,7 +623,7 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
               selectedToken={fromToken}
               onSelect={(token) => {
                 setFromToken(token);
-                setCachedAmounts({ fromAmount: '', toAmount: '' });
+                setCachedAmounts({ fromAmount: "", toAmount: "" });
                 setEditingField(null);
               }}
               label="Select"
@@ -534,11 +637,15 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
                 value={cachedAmounts.fromAmount}
                 onChange={(e) => {
                   setCachedAmounts({ fromAmount: e.target.value });
-                  setEditingField('from');
+                  setEditingField("from");
                 }}
                 disabled={!fromToken}
                 className="!h-11 !text-lg !font-extrabold bg-white"
-                rightElement={<span className="text-xs font-bold text-stone-500">{fromToken?.symbol}</span>}
+                rightElement={
+                  <span className="text-xs font-bold text-stone-500">
+                    {fromToken?.symbol}
+                  </span>
+                }
               />
               {fromUsdValue !== null && (
                 <div className="absolute right-16 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-500 flex items-center gap-1">
@@ -557,7 +664,7 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
             onClick={handleSwapTokens}
             disabled={!fromToken || !toToken}
             className={cn(
-              'rounded-full bg-primary border-2 border-solid border-black p-2.5 text-primary-foreground transition-all hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 brutalist-shadow-sm'
+              "rounded-full bg-primary border-2 border-solid border-black p-2.5 text-primary-foreground transition-all hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 brutalist-shadow-sm",
             )}
           >
             <ArrowDownUp className="h-4 w-4" />
@@ -583,9 +690,9 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
                 setToToken(token);
                 // Keep from amount, recalculate to amount
                 if (cachedAmounts.fromAmount) {
-                  setEditingField('from');
+                  setEditingField("from");
                 } else {
-                  setCachedAmounts({ toAmount: '' });
+                  setCachedAmounts({ toAmount: "" });
                   setEditingField(null);
                 }
               }}
@@ -600,11 +707,15 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
                 value={cachedAmounts.toAmount}
                 onChange={(e) => {
                   setCachedAmounts({ toAmount: e.target.value });
-                  setEditingField('to');
+                  setEditingField("to");
                 }}
                 disabled={!toToken}
                 className="!h-11 !text-lg !font-extrabold bg-white"
-                rightElement={<span className="text-xs font-bold text-stone-500">{toToken?.symbol}</span>}
+                rightElement={
+                  <span className="text-xs font-bold text-stone-500">
+                    {toToken?.symbol}
+                  </span>
+                }
               />
               {toUsdValue !== null && (
                 <div className="absolute right-16 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-500 flex items-center gap-1">
@@ -621,38 +732,57 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
       {(calculatedOutput || (fromUsdValue && toUsdValue)) && (
         <div className="bg-stone-100 border-2 border-solid border-black rounded-xl p-4 brutalist-shadow-sm space-y-3">
           {/* Exchange Rate */}
-          {calculatedOutput && fromToken && toToken && cachedAmounts.fromAmount && (() => {
-            const fromAmountBigInt = parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18);
-            return fromAmountBigInt > 0n;
-          })() && (
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-500">
-                Rate
-              </span>
-              <span className="text-xs font-bold text-stone-900">
-                1 {fromToken.symbol} = {' '}
-                {formatBigInt(
-                  (calculatedOutput * BigInt(10 ** (fromToken.decimals ?? 18))) /
-                    parseBigInt(cachedAmounts.fromAmount, fromToken.decimals ?? 18),
-                  toToken.decimals ?? 18
-                )}{' '}
-                {toToken.symbol}
-              </span>
-            </div>
-          )}
+          {calculatedOutput &&
+            fromToken &&
+            toToken &&
+            cachedAmounts.fromAmount &&
+            (() => {
+              const fromAmountBigInt = parseBigInt(
+                cachedAmounts.fromAmount,
+                fromToken.decimals ?? 18,
+              );
+              return fromAmountBigInt > 0n;
+            })() && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-500">
+                  Rate
+                </span>
+                <span className="text-xs font-bold text-stone-900">
+                  1 {fromToken.symbol} ={" "}
+                  {formatBigInt(
+                    (calculatedOutput *
+                      BigInt(10 ** (fromToken.decimals ?? 18))) /
+                      parseBigInt(
+                        cachedAmounts.fromAmount,
+                        fromToken.decimals ?? 18,
+                      ),
+                    toToken.decimals ?? 18,
+                  )}{" "}
+                  {toToken.symbol}
+                </span>
+              </div>
+            )}
 
           {/* Live Prices */}
           <div className="grid grid-cols-2 gap-2">
             {fromUsdPrice && (
               <div className="bg-white border-2 border-stone-300 rounded-lg p-2 text-center">
-                <p className="text-[9px] font-bold uppercase tracking-wider text-stone-500">{fromToken?.symbol}</p>
-                <p className="text-sm font-black text-stone-900">${safeFixed(fromUsdPrice, 4)}</p>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-stone-500">
+                  {fromToken?.symbol}
+                </p>
+                <p className="text-sm font-black text-stone-900">
+                  ${safeFixed(fromUsdPrice, 4)}
+                </p>
               </div>
             )}
             {toUsdPrice && (
               <div className="bg-white border-2 border-stone-300 rounded-lg p-2 text-center">
-                <p className="text-[9px] font-bold uppercase tracking-wider text-stone-500">{toToken?.symbol}</p>
-                <p className="text-sm font-black text-stone-900">${safeFixed(toUsdPrice, 4)}</p>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-stone-500">
+                  {toToken?.symbol}
+                </p>
+                <p className="text-sm font-black text-stone-900">
+                  ${safeFixed(toUsdPrice, 4)}
+                </p>
               </div>
             )}
           </div>
@@ -707,7 +837,8 @@ export function SwapForm({ factoryAddress, routerAddress, availableTokens = [] }
       {needsApproval && allowance !== undefined && allowance > BigInt(0) && (
         <div className="bg-accent/10 border-2 border-solid border-accent rounded-xl px-3 py-2 text-center">
           <p className="text-[10px] font-bold uppercase tracking-wide text-stone-700">
-            Approve {formatBigInt(allowance, fromToken?.decimals ?? 18)} {fromToken?.symbol} more
+            Approve {formatBigInt(allowance, fromToken?.decimals ?? 18)}{" "}
+            {fromToken?.symbol} more
           </p>
         </div>
       )}

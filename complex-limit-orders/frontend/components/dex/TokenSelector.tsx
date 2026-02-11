@@ -4,8 +4,11 @@ import { useState, useMemo, useCallback } from "react";
 import { Search, ChevronDown } from "lucide-react";
 import { cn, shortenAddress } from "@/lib/utils";
 import { Dialog } from "@/components/ui/Dialog";
-import { useCoinbasePriceById } from "@/lib/hooks/useCoinbasePrice";
-import { useTokenBalances, type TokenInfo } from "@/context/TokenBalancesContext";
+import { useQuery, useQueries } from "@tanstack/react-query";
+import {
+  useTokenBalances,
+  type TokenInfo,
+} from "@/context/TokenBalancesContext";
 
 // Format large token numbers with K/M/B suffixes
 function formatLargeToken(value: number): string {
@@ -61,7 +64,13 @@ export function TokenSelector({
   const { getBalance } = useTokenBalances();
 
   // Fetch USD price for selected token
-  const { data: selectedUsdPrice } = useCoinbasePriceById(selectedToken?.coinbaseId);
+  const { data: selectedUsdPrice } = useQuery({
+    queryKey: ["coinbase-price", selectedToken?.coinbaseId],
+    queryFn: () => fetchCoinbasePrice(selectedToken?.coinbaseId),
+    enabled: !!selectedToken?.coinbaseId,
+    staleTime: 15_000,
+    gcTime: 30_000,
+  });
 
   // Filter tokens by search query
   const filteredTokens = useMemo(() => {
@@ -86,7 +95,9 @@ export function TokenSelector({
   );
 
   // Get selected token balance from context
-  const selectedBalance = selectedToken ? getBalance(selectedToken.address) : "0";
+  const selectedBalance = selectedToken
+    ? getBalance(selectedToken.address)
+    : "0";
 
   // Calculate USD value for display
   const selectedUsdValue = useMemo(() => {
@@ -199,6 +210,27 @@ export function TokenSelector({
   );
 }
 
+// Coinbase API base URL
+const COINBASE_API = "https://api.coinbase.com/v2";
+
+// Fetch price from Coinbase
+async function fetchCoinbasePrice(coinbaseId?: string): Promise<number | null> {
+  if (!coinbaseId) return null;
+  try {
+    const response = await fetch(
+      `${COINBASE_API}/exchange-rates?currency=${coinbaseId}`,
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    const usdRate = data.data?.rates?.USD;
+    if (!usdRate) return null;
+    const price = parseFloat(usdRate);
+    return isNaN(price) ? null : price;
+  } catch {
+    return null;
+  }
+}
+
 // Token List with balance ranking - stateless, receives balances as callback
 function TokenList({
   tokens,
@@ -213,13 +245,21 @@ function TokenList({
   disabledTokenAddress?: `0x${string}` | null;
   getBalance: (tokenAddress: string) => string;
 }) {
-  // Fetch prices for USD value calculation (still needed for sorting)
-  const prices = tokens.map((token) => useCoinbasePriceById(token.coinbaseId));
+  // Fetch prices for USD value calculation using useQueries (compliant with Rules of Hooks)
+  const priceQueries = useQueries({
+    queries: tokens.map((token) => ({
+      queryKey: ["coinbase-price", token.coinbaseId],
+      queryFn: () => fetchCoinbasePrice(token.coinbaseId),
+      enabled: !!token.coinbaseId,
+      staleTime: 15_000,
+      gcTime: 30_000,
+    })),
+  });
 
   // Combine tokens with balance (from context) and price data
   const tokensWithData: TokenWithBalance[] = useMemo(() => {
     return tokens.map((token, index) => {
-      const { data: usdPrice } = prices[index];
+      const usdPrice = priceQueries[index]?.data ?? null;
       const balanceFormatted = getBalance(token.address);
       const balance = parseFloat(balanceFormatted) || 0;
 
@@ -232,7 +272,7 @@ function TokenList({
         usdValue,
       };
     });
-  }, [tokens, prices, getBalance]);
+  }, [tokens, priceQueries, getBalance]);
 
   // Sort by USD value (highest first), unless searching
   const sortedTokens = useMemo(() => {
@@ -321,7 +361,7 @@ function TokenListItem({
         "flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left transition-all",
         isDisabled
           ? "border-transparent bg-stone-100 opacity-50 cursor-not-allowed"
-          : "border-transparent hover:border-stone-300 hover:bg-stone-100 active:scale-95"
+          : "border-transparent hover:border-stone-300 hover:bg-stone-100 active:scale-95",
       )}
     >
       {/* Token Icon */}

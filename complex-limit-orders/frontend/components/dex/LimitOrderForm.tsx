@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAccount, useBalance, useReadContracts } from "wagmi";
 import type { Address } from "viem";
 import {
@@ -180,7 +180,9 @@ export function LimitOrderForm() {
   // Available tokens for selection
   const availableTokens = useMemo(() => {
     const tokenAddresses = Array.from(tokenToPoolsMap.keys());
-    return AVAILABLE_TOKENS.filter((t) => tokenAddresses.includes(t.address.toLowerCase()));
+    return AVAILABLE_TOKENS.filter((t) =>
+      tokenAddresses.includes(t.address.toLowerCase()),
+    );
   }, [tokenToPoolsMap]);
 
   const [selectedToken, setSelectedToken] = useState<TokenInfo | null>(null);
@@ -238,7 +240,7 @@ export function LimitOrderForm() {
   }, [amount, inputDecimals]);
 
   // Check if approval is needed
-  useMemo(() => {
+  useEffect(() => {
     const allowanceValue = allowance as bigint | undefined;
     if (allowanceValue != null && amountBigInt > 0n) {
       setNeedsApproval(allowanceValue < amountBigInt);
@@ -266,7 +268,9 @@ export function LimitOrderForm() {
     // Determine correct contract direction based on token position in pair
     // contract direction=true = token0→token1 (sell token0, get token1)
     // contract direction=false = token1→token0 (sell token1, get token0)
-    const selectedTokenIsToken0 = selectedToken?.address.toLowerCase() === paymentToken.token0.address.toLowerCase();
+    const selectedTokenIsToken0 =
+      selectedToken?.address.toLowerCase() ===
+      paymentToken.token0.address.toLowerCase();
     // If buying selectedToken: need opposite direction (swap other token for selected)
     // If selling selectedToken: need matching direction (swap selected for other)
     const contractDirection = (direction === "buy") !== selectedTokenIsToken0;
@@ -585,9 +589,11 @@ export function LimitOrderForm() {
               : "bg-accent hover:bg-accent/90 text-accent-foreground"
           } disabled:bg-stone-300 disabled:cursor-not-allowed font-black rounded-lg px-3 py-3 brutalist-shadow transition-all hover:translate-y-1 hover:shadow-[2px_2px_0_0_#000] active:shadow-none active:translate-y-2 uppercase tracking-widest flex items-center justify-center gap-2 text-sm flex-shrink-0`}
         >
-          {(isEncrypting || isSigning || isPending || isConfirming || isApproving) && (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          )}
+          {(isEncrypting ||
+            isSigning ||
+            isPending ||
+            isConfirming ||
+            isApproving) && <Loader2 className="w-4 h-4 animate-spin" />}
           {isEncrypting
             ? "Encrypting..."
             : isSigning

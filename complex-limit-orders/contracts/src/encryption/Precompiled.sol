@@ -30,11 +30,10 @@ library Precompiled {
         return returnData;
     }
 
-    function encryptECIES(
-        address encryptECIESAddress,
-        bytes memory data,
-        PublicKey memory publicKey
-    ) internal returns (bytes memory) {
+    function encryptECIES(address encryptECIESAddress, bytes memory data, PublicKey memory publicKey)
+        internal
+        returns (bytes memory)
+    {
         bytes memory input = abi.encode(data, publicKey.x, publicKey.y);
         (bool success, bytes memory returnData) = encryptECIESAddress.staticcall(input);
         if (!success) revert PrecompiledCallFailed();

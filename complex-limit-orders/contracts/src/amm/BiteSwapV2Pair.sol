@@ -300,17 +300,11 @@ contract BiteSwapV2Pair is IBiteSwapV2Pair, ERC20, ReentrancyGuard {
     }
 
     /// @notice Calculate input amounts after output transfer
-    function _calculateInputAmounts(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        uint112 _reserve0,
-        uint112 _reserve1
-    ) internal view returns (
-        uint256 balance0,
-        uint256 balance1,
-        uint256 amount0In,
-        uint256 amount1In
-    ) {
+    function _calculateInputAmounts(uint256 amount0Out, uint256 amount1Out, uint112 _reserve0, uint112 _reserve1)
+        internal
+        view
+        returns (uint256 balance0, uint256 balance1, uint256 amount0In, uint256 amount1In)
+    {
         balance0 = IERC20(token0).balanceOf(address(this));
         balance1 = IERC20(token1).balanceOf(address(this));
         amount0In = balance0 > _reserve0 - amount0Out ? balance0 - (_reserve0 - amount0Out) : 0;

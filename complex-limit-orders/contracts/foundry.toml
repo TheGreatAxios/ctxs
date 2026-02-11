@@ -15,6 +15,6 @@ remappings = [
 ]
 
 [rpc_endpoints]
-skale_bite = "https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox"
+skale_testnet = "https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

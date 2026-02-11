@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useAccount, useReadContract, useWriteContract, useBlockNumber } from 'wagmi'
-import { formatEther } from 'viem'
+import { useReadContract, useBlockNumber } from 'wagmi'
+import { List, Search } from 'lucide-react'
 import { CONTRACT_ABI } from '../config/contract'
 
 interface GameListProps {
@@ -8,42 +8,7 @@ interface GameListProps {
   onSelectGame: (gameId: number) => void
 }
 
-interface GameData {
-  player1: string
-  player2: string
-  commitment1: string
-  commitment2: string
-  move1: number
-  move2: number
-  wagerAmount: bigint
-  wagerToken: string
-  commitDeadline: bigint
-  revealDeadline: bigint
-  state: number
-  winner: string
-  player1Revealed: boolean
-  player2Revealed: boolean
-}
-
-const stateLabels: Record<number, string> = {
-  0: 'Waiting',
-  1: 'Committed',
-  2: 'Revealing',
-  3: 'Finished',
-  4: 'Expired',
-}
-
-const stateClasses: Record<number, string> = {
-  0: 'status-created',
-  1: 'status-committed',
-  2: 'status-revealed',
-  3: 'status-finished',
-  4: 'status-expired',
-}
-
 export default function GameList({ contractAddress, onSelectGame }: GameListProps) {
-  const { address } = useAccount()
-  const [games, setGames] = useState<{ id: number; data: GameData }[]>([])
   const [nextGameId, setNextGameId] = useState(0)
 
   // Poll for latest block to refresh
@@ -63,27 +28,44 @@ export default function GameList({ contractAddress, onSelectGame }: GameListProp
     }
   }, [gameCount])
 
-  // For now, show placeholder - in a real app, you'd index events or use a subgraph
   return (
     <div className="card">
-      <h2>Active Games</h2>
-      <p style={{ opacity: 0.8, marginBottom: '1rem' }}>
-        Next Game ID: {nextGameId}
+      <div className="flex items-center gap-2 mb-4">
+        <List className="w-5 h-5 text-neon-cyan" />
+        <h2 style={{ margin: 0 }}>// GAME_BROWSER</h2>
+      </div>
+
+      <p style={{ color: 'hsla(180, 100%, 70%, 0.8)', marginBottom: '1.5rem', fontFamily: 'JetBrains Mono', fontSize: '0.85rem' }}>
+        <span className="text-neon-purple">NEXT_GAME_ID:</span> #{nextGameId}
       </p>
+
       <div className="form-group">
-        <label>Enter Game ID to View</label>
+        <label className="flex items-center gap-2">
+          <Search className="w-4 h-4" />
+          SEARCH GAME
+        </label>
         <input
           type="number"
-          placeholder="Game ID"
+          placeholder="Enter Game ID..."
           onChange={(e) => {
             const id = parseInt(e.target.value)
             if (id >= 0) onSelectGame(id)
           }}
         />
       </div>
-      <p style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: '1rem' }}>
-        Games are indexed by ID. Enter any game ID above to view its details.
-      </p>
+
+      <div className="mt-6 p-4 rounded-lg" style={{
+        background: 'linear-gradient(135deg, hsla(280, 70%, 25%, 0.15), hsla(280, 70%, 15%, 0.2))',
+        border: '1px dashed hsla(280, 70%, 55%, 0.3)'
+      }}>
+        <p style={{ fontSize: '0.8rem', color: 'hsla(180, 100%, 70%, 0.8)', fontFamily: 'JetBrains Mono', lineHeight: '1.6' }}>
+          <span className="text-neon-cyan">▸</span> Games indexed by ID
+          <br />
+          <span className="text-neon-cyan">▸</span> Enter ID above to view details
+          <br />
+          <span className="text-neon-cyan">▸</span> All data on-chain
+        </p>
+      </div>
     </div>
   )
 }

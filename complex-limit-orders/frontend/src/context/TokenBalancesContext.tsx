@@ -1,8 +1,15 @@
-'use client';
+"use client";
 
-import { createContext, useContext, ReactNode, useMemo, useRef, useCallback } from 'react';
-import { useAccount, useBalance } from 'wagmi';
-import { formatBigInt } from '@/lib/utils';
+import {
+  createContext,
+  useContext,
+  ReactNode,
+  useMemo,
+  useCallback,
+} from "react";
+import { useAccount, useReadContracts } from "wagmi";
+import { formatBigInt } from "@/lib/utils";
+import type { Address } from "viem";
 
 export interface TokenInfo {
   address: `0x${string}`;
@@ -23,47 +30,74 @@ interface TokenBalancesContextType {
   balancesMap: Map<string, string>;
 }
 
-const TokenBalancesContext = createContext<TokenBalancesContextType | undefined>(undefined);
+const TokenBalancesContext = createContext<
+  TokenBalancesContextType | undefined
+>(undefined);
 
 interface TokenBalancesProviderProps {
   children: ReactNode;
   tokens: TokenInfo[];
 }
 
-export function TokenBalancesProvider({ children, tokens }: TokenBalancesProviderProps) {
+const ERC20_BALANCE_ABI = [
+  {
+    name: "balanceOf",
+    type: "function" as const,
+    stateMutability: "view" as const,
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
+export function TokenBalancesProvider({
+  children,
+  tokens,
+}: TokenBalancesProviderProps) {
   const { address: walletAddress } = useAccount();
 
-  // Fetch all token balances at provider level (single source of truth)
-  const balances = tokens.map((token) =>
-    useBalance({
-      address: walletAddress as `0x${string}` | undefined,
-      token:
-        token.address === '0x0000000000000000000000000000000000000000'
-          ? undefined
-          : token.address,
-    })
+  // Memoize contracts array to prevent infinite re-renders
+  const contracts = useMemo(
+    () =>
+      tokens.map((token) => ({
+        address: token.address as Address,
+        abi: ERC20_BALANCE_ABI,
+        functionName: "balanceOf" as const,
+        args: [walletAddress as Address],
+      })),
+    [tokens, walletAddress],
   );
 
-  // Build a stable map of balances - only recreate when actual balance data changes
+  // Batch fetch all token balances using useReadContracts
+  const { data: balancesData } = useReadContracts({
+    contracts,
+    query: {
+      enabled: !!walletAddress && tokens.length > 0,
+    },
+  });
+
+  // Build a stable map of balances
   const balancesMap = useMemo(() => {
     const map = new Map<string, string>();
     tokens.forEach((token, index) => {
-      const { data } = balances[index];
-      if (data) {
-        map.set(token.address.toLowerCase(), formatBigInt(data.value, data.decimals));
+      const result = balancesData?.[index];
+      if (result?.status === "success") {
+        map.set(
+          token.address.toLowerCase(),
+          formatBigInt(result.result as bigint, token.decimals ?? 18),
+        );
       } else {
-        map.set(token.address.toLowerCase(), '0');
+        map.set(token.address.toLowerCase(), "0");
       }
     });
     return map;
-  }, [tokens, balances]);
+  }, [tokens, balancesData]);
 
   // Stable reference for getBalance using useCallback
   const getBalance = useCallback(
     (tokenAddress: string): string => {
-      return balancesMap.get(tokenAddress.toLowerCase()) ?? '0';
+      return balancesMap.get(tokenAddress.toLowerCase()) ?? "0";
     },
-    [balancesMap]
+    [balancesMap],
   );
 
   // Stable reference for getTokenBalance using useCallback
@@ -73,13 +107,13 @@ export function TokenBalancesProvider({ children, tokens }: TokenBalancesProvide
       if (!balance) return null;
       return { balance };
     },
-    [balancesMap]
+    [balancesMap],
   );
 
   // Memoize context value to prevent unnecessary re-renders
   const contextValue = useMemo(
     () => ({ getBalance, getTokenBalance, balancesMap }),
-    [getBalance, getTokenBalance, balancesMap]
+    [getBalance, getTokenBalance, balancesMap],
   );
 
   return (
@@ -92,7 +126,9 @@ export function TokenBalancesProvider({ children, tokens }: TokenBalancesProvide
 export function useTokenBalances() {
   const context = useContext(TokenBalancesContext);
   if (!context) {
-    throw new Error('useTokenBalances must be used within TokenBalancesProvider');
+    throw new Error(
+      "useTokenBalances must be used within TokenBalancesProvider",
+    );
   }
   return context;
 }

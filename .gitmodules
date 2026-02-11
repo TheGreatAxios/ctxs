@@ -4,3 +4,9 @@
 [submodule "rocket-crash/contracts/lib/forge-std"]
 	path = rocket-crash/contracts/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "rock-paper-scissors/contracts/lib/openzeppelin-contracts"]
+	path = rock-paper-scissors/contracts/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "rock-paper-scissors/contracts/lib/forge-std"]
+	path = rock-paper-scissors/contracts/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std

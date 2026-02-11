@@ -79,11 +79,11 @@ contract AddLiquidity is Script {
             string memory symbol1 = poolInfos[i].symbol1;
             string memory status = poolInfos[i].needsLiquidity ? "NEEDS LIQUIDITY" : "OK";
 
-            string memory logStr = string(abi.encodePacked(
-                "  ", symbol0, "/", symbol1,
-                " | TVL: $", _formatUsd(poolInfos[i].tvlUsd),
-                " | ", status
-            ));
+            string memory logStr = string(
+                abi.encodePacked(
+                    "  ", symbol0, "/", symbol1, " | TVL: $", _formatUsd(poolInfos[i].tvlUsd), " | ", status
+                )
+            );
             console.log(logStr);
 
             if (poolInfos[i].needsLiquidity) {
@@ -91,7 +91,9 @@ contract AddLiquidity is Script {
             }
         }
 
-        console.log(string(abi.encodePacked("\n=== Pools needing liquidity: ", vm.toString(needsLiquidityCount), " ===")));
+        console.log(
+            string(abi.encodePacked("\n=== Pools needing liquidity: ", vm.toString(needsLiquidityCount), " ==="))
+        );
 
         // Add liquidity to pools that need it
         for (uint256 i = 0; i < poolInfos.length; i++) {
@@ -149,12 +151,11 @@ contract AddLiquidity is Script {
         });
     }
 
-    function _calculateTVL(
-        address token0,
-        address token1,
-        uint256 reserve0,
-        uint256 reserve1
-    ) internal pure returns (uint256) {
+    function _calculateTVL(address token0, address token1, uint256 reserve0, uint256 reserve1)
+        internal
+        pure
+        returns (uint256)
+    {
         uint256 value0 = _getTokenValue(token0, reserve0);
         uint256 value1 = _getTokenValue(token1, reserve1);
         return value0 + value1;
@@ -164,9 +165,11 @@ contract AddLiquidity is Script {
         // Approximate USD values (6 decimals)
         if (token == USDC || token == USDT) {
             return amount; // Already 6 decimals
-        } else if (token == WETH) { // ~$3000
+        } else if (token == WETH) {
+            // ~$3000
             return (amount * 3000 * 10 ** 6) / 10 ** 18;
-        } else if (token == WBTC) { // ~$100k
+        } else if (token == WBTC) {
+            // ~$100k
             return (amount * 100_000 * 10 ** 6) / 10 ** 8;
         }
         return 0;
@@ -183,19 +186,13 @@ contract AddLiquidity is Script {
     function _formatUsd(uint256 amount) internal pure returns (string memory) {
         uint256 dollars = amount / 10 ** 6;
         if (dollars >= 1_000_000) {
-            return string(abi.encodePacked(
-                vm.toString(dollars / 1_000_000),
-                ".",
-                vm.toString((dollars % 1_000_000) / 10_000),
-                "M"
-            ));
+            return string(
+                abi.encodePacked(
+                    vm.toString(dollars / 1_000_000), ".", vm.toString((dollars % 1_000_000) / 10_000), "M"
+                )
+            );
         } else if (dollars >= 1_000) {
-            return string(abi.encodePacked(
-                vm.toString(dollars / 1_000),
-                ".",
-                vm.toString((dollars % 1_000) / 10),
-                "K"
-            ));
+            return string(abi.encodePacked(vm.toString(dollars / 1_000), ".", vm.toString((dollars % 1_000) / 10), "K"));
         }
         return vm.toString(dollars);
     }
@@ -219,15 +216,16 @@ contract AddLiquidity is Script {
             console.log("  Empty pool - adding 50/50 by value");
         } else {
             // Add proportionally to existing reserves
-            uint256 totalValue = _getTokenValue(pool.token0, pool.reserve0) +
-                               _getTokenValue(pool.token1, pool.reserve1);
+            uint256 totalValue = _getTokenValue(pool.token0, pool.reserve0) + _getTokenValue(pool.token1, pool.reserve1);
             uint256 ratio0 = (_getTokenValue(pool.token0, pool.reserve0) * 100) / totalValue;
             uint256 ratio1 = (_getTokenValue(pool.token1, pool.reserve1) * 100) / totalValue;
 
             amount0 = _usdToTokenAmount(pool.token0, (liquidityToAdd * ratio0) / 100);
             amount1 = _usdToTokenAmount(pool.token1, (liquidityToAdd * ratio1) / 100);
 
-            console.log(string(abi.encodePacked("  Ratio0: ", vm.toString(ratio0), "% | Ratio1: ", vm.toString(ratio1), "%")));
+            console.log(
+                string(abi.encodePacked("  Ratio0: ", vm.toString(ratio0), "% | Ratio1: ", vm.toString(ratio1), "%"))
+            );
         }
 
         // Minimum amounts (allow 0.5% slippage)
@@ -237,15 +235,8 @@ contract AddLiquidity is Script {
         console.log(string(abi.encodePacked("  Amount0: ", vm.toString(amount0), " ", pool.symbol0)));
         console.log(string(abi.encodePacked("  Amount1: ", vm.toString(amount1), " ", pool.symbol1)));
 
-        IBiteSwapV2Router(ROUTER).addLiquidity(
-            pool.token0,
-            pool.token1,
-            amount0,
-            amount1,
-            amount0Min,
-            amount1Min,
-            msg.sender
-        );
+        IBiteSwapV2Router(ROUTER)
+            .addLiquidity(pool.token0, pool.token1, amount0, amount1, amount0Min, amount1Min, msg.sender);
 
         console.log("  Liquidity added!");
     }
@@ -253,9 +244,11 @@ contract AddLiquidity is Script {
     function _usdToTokenAmount(address token, uint256 usdAmount) internal pure returns (uint256) {
         if (token == USDC || token == USDT) {
             return usdAmount; // 6 decimals
-        } else if (token == WETH) { // 18 decimals, ~$3000
+        } else if (token == WETH) {
+            // 18 decimals, ~$3000
             return (usdAmount * 10 ** 18) / (3000 * 10 ** 6);
-        } else if (token == WBTC) { // 8 decimals, ~$100k
+        } else if (token == WBTC) {
+            // 8 decimals, ~$100k
             return (usdAmount * 10 ** 8) / (100_000 * 10 ** 6);
         }
         return 0;

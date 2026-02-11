@@ -251,9 +251,37 @@ contract BiteSwapV2Router {
             address input = path[i];
             address output = path[i + 1];
             address pairAddr = BiteSwapV2Library.pairFor(address(factory), input, output);
-            (uint256 amount0Out, uint256 amount1Out) = BiteSwapV2Library.getSwapAmounts(pairAddr, input, output);
-            address to = i < path.length - 2 ? BiteSwapV2Library.pairFor(address(factory), output, path[i + 2]) : _to;
+
+            // Determine recipient
+            address to;
+            if (i < path.length - 2) {
+                to = BiteSwapV2Library.pairFor(address(factory), output, path[i + 2]);
+            } else {
+                to = _to;
+            }
+
+            // Calculate output amounts
+            (uint256 amount0Out, uint256 amount1Out) = _getSwapAmounts(input, output, pairAddr);
+
             IBiteSwapV2Pair(pairAddr).swap(amount0Out, amount1Out, to, new bytes(0));
+        }
+    }
+
+    /// @notice Calculate swap amounts for a single hop
+    function _getSwapAmounts(address input, address output, address pairAddr)
+        internal
+        view
+        returns (uint256 amount0Out, uint256 amount1Out)
+    {
+        (uint256 reserveIn, uint256 reserveOut) = BiteSwapV2Library.getReserves(address(factory), input, output);
+        uint256 amountIn = IERC20(input).balanceOf(pairAddr) - reserveIn;
+        uint256 amountOut = BiteSwapV2Library.getAmountOut(amountIn, reserveIn, reserveOut);
+
+        (address token0,) = BiteSwapV2Library.sortTokens(input, output);
+        if (input == token0) {
+            return (0, amountOut);
+        } else {
+            return (amountOut, 0);
         }
     }
 

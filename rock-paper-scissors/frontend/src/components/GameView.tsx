@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAccount, useReadContract, useWriteContract } from 'wagmi'
 import { formatEther } from 'viem'
+import { ArrowLeft, Gauge, File, Scissors, Lock } from 'lucide-react'
 import { CONTRACT_ABI } from '../config/contract'
 
 interface GameViewProps {
@@ -26,35 +27,33 @@ interface GameData {
   player2Revealed: boolean
 }
 
-type Move = 0 | 1 | 2 | 3
-
-const moveEmojis: Record<number, string> = {
-  0: '❓',
-  1: '✊',
-  2: '✋',
-  3: '✌️',
+const moveIcons: Record<number, any> = {
+  0: Lock,
+  1: Gauge,
+  2: File,
+  3: Scissors,
 }
 
 const moveNames: Record<number, string> = {
-  0: 'Hidden',
-  1: 'Rock',
-  2: 'Paper',
-  3: 'Scissors',
+  0: 'HIDDEN',
+  1: 'ROCK',
+  2: 'PAPER',
+  3: 'SCISSORS',
 }
 
 const stateLabels: Record<number, string> = {
-  0: 'Waiting for Player 2',
-  1: 'Both Committed - Reveal Phase',
-  2: 'Revealing Moves',
-  3: 'Game Finished',
-  4: 'Expired',
+  0: 'AWAITING PLAYER 2',
+  1: 'REVEAL PHASE',
+  2: 'REVEALING',
+  3: 'GAME OVER',
+  4: 'EXPIRED',
 }
 
 export default function GameView({ gameId, contractAddress, onClose }: GameViewProps) {
   const { address } = useAccount()
   const [nonce, setNonce] = useState('')
 
-  const { data: game, refetch } = useReadContract({
+  const { data: game } = useReadContract({
     address: contractAddress as `0x${string}`,
     abi: CONTRACT_ABI,
     functionName: 'getGame',
@@ -72,7 +71,7 @@ export default function GameView({ gameId, contractAddress, onClose }: GameViewP
 
   const handleReveal = () => {
     if (!nonce || !isPlayer) return
-    
+
     revealMove({
       address: contractAddress as `0x${string}`,
       abi: CONTRACT_ABI,
@@ -93,18 +92,23 @@ export default function GameView({ gameId, contractAddress, onClose }: GameViewP
   const getWinnerText = () => {
     if (!gameData) return ''
     if (gameData.winner === '0x0000000000000000000000000000000000000000') {
-      return "It's a Draw!"
+      return "DRAW"
     }
     if (gameData.winner.toLowerCase() === address?.toLowerCase()) {
-      return 'You Won!'
+      return 'VICTORY'
     }
-    return 'You Lost!'
+    return 'DEFEAT'
+  }
+
+  const renderMoveIcon = (move: number) => {
+    const Icon = moveIcons[move] || Lock
+    return <Icon size={64} strokeWidth={2} />
   }
 
   if (!gameData) {
     return (
       <div className="card">
-        <h2>Game #{gameId}</h2>
+        <h2 style={{ fontFamily: 'Orbitron', letterSpacing: '0.15em' }}>// GAME_#{gameId}</h2>
         <div className="loading">
           <div className="spinner"></div>
         </div>
@@ -112,68 +116,110 @@ export default function GameView({ gameId, contractAddress, onClose }: GameViewP
     )
   }
 
+  const hasWager = gameData.wagerAmount > 0n
+  const isNativeWager = gameData.wagerToken === '0x0000000000000000000000000000000000000000'
+
   return (
     <div className="card" style={{ gridColumn: '1 / -1' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h2>Game #{gameId}</h2>
-        <button className="action-btn" onClick={onClose}>Back to List</button>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
+        <h2 style={{ fontFamily: 'Orbitron', letterSpacing: '0.15em', margin: 0 }}>
+          <span className="text-neon-cyan">#</span>{gameId}
+        </h2>
+        <button
+          className="action-btn"
+          onClick={onClose}
+          style={{ width: 'auto', padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+        >
+          <ArrowLeft size={16} />
+          BACK
+        </button>
       </div>
 
+      {/* Status */}
       <div className="game-status-large">
-        <strong>Status:</strong> {stateLabels[gameData.state] || 'Unknown'}
+        <span className="text-neon-cyan">STATUS:</span> {stateLabels[gameData.state] || 'UNKNOWN'}
       </div>
 
+      {/* Players */}
       <div className="players-info">
         <div className="player-box">
-          <h3>Player 1</h3>
-          <div style={{ fontSize: '4rem', margin: '1rem 0' }}>
-            {moveEmojis[gameData.move1]}
+          <h3>PLAYER_1</h3>
+          <div className="player-move-display text-neon-cyan" style={{ filter: 'drop-shadow(0 0 20px hsla(180, 100%, 50%, 0.6))' }}>
+            {renderMoveIcon(gameData.move1)}
           </div>
-          <div>{moveNames[gameData.move1]}</div>
+          <div style={{ fontFamily: 'Orbitron', letterSpacing: '0.1em', fontSize: '0.85rem' }}>
+            {moveNames[gameData.move1]}
+          </div>
           <div className="player-address">{gameData.player1.slice(0, 8)}...</div>
-          {gameData.player1Revealed && <span style={{ color: '#4CAF50' }}>Revealed</span>}
+          {gameData.player1Revealed && (
+            <span style={{ color: 'hsl(var(--color-neon-green))', fontSize: '0.7rem', fontWeight: '700' }}>
+              ✓ REVEALED
+            </span>
+          )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', fontSize: '2rem' }}>VS</div>
-
         <div className="player-box">
-          <h3>Player 2</h3>
-          <div style={{ fontSize: '4rem', margin: '1rem 0' }}>
-            {gameData.player2 === '0x0000000000000000000000000000000000000000' 
-              ? '👤' 
-              : moveEmojis[gameData.move2]}
+          <h3>PLAYER_2</h3>
+          <div className={`player-move-display ${gameData.player2 !== '0x0000000000000000000000000000000000000000' ? 'text-neon-purple' : ''}`}
+               style={{ filter: gameData.player2 !== '0x0000000000000000000000000000000000000000' ? 'drop-shadow(0 0 20px hsla(280, 70%, 55%, 0.6))' : '' }}>
+            {gameData.player2 === '0x0000000000000000000000000000000000000000'
+              ? <Lock size={64} strokeWidth={2} />
+              : renderMoveIcon(gameData.move2)}
           </div>
-          <div>
-            {gameData.player2 === '0x0000000000000000000000000000000000000000' 
-              ? 'Waiting...' 
+          <div style={{ fontFamily: 'Orbitron', letterSpacing: '0.1em', fontSize: '0.85rem' }}>
+            {gameData.player2 === '0x0000000000000000000000000000000000000000'
+              ? 'WAITING...'
               : moveNames[gameData.move2]}
           </div>
           {gameData.player2 !== '0x0000000000000000000000000000000000000000' && (
             <>
               <div className="player-address">{gameData.player2.slice(0, 8)}...</div>
-              {gameData.player2Revealed && <span style={{ color: '#4CAF50' }}>Revealed</span>}
+              {gameData.player2Revealed && (
+                <span style={{ color: 'hsl(var(--color-neon-green))', fontSize: '0.7rem', fontWeight: '700' }}>
+                  ✓ REVEALED
+                </span>
+              )}
             </>
           )}
         </div>
       </div>
 
-      <div style={{ textAlign: 'center', margin: '1.5rem 0', padding: '1rem', background: 'rgba(255,255,255,0.1)', borderRadius: '10px' }}>
-        <strong>Wager:</strong> {formatEther(gameData.wagerAmount)} sFUEL
-      </div>
-
-      {gameData.state === 3 && (
-        <div className={`winner-announcement ${
-          gameData.winner.toLowerCase() === address?.toLowerCase() ? 'win' : 
-          gameData.winner === '0x0000000000000000000000000000000000000000' ? 'draw' : 'lose'
-        }`}>
-          {getWinnerText()}
+      {/* Wager - ERC-20 only */}
+      {hasWager && (
+        <div style={{
+          textAlign: 'center',
+          margin: '1.5rem 0',
+          padding: '1.25rem',
+          background: 'linear-gradient(135deg, hsla(180, 100%, 50%, 0.1), hsla(280, 70%, 55%, 0.1))',
+          borderRadius: '10px',
+          border: '1px solid hsla(180, 100%, 50%, 0.3)',
+          fontWeight: '700',
+          fontFamily: 'Orbitron',
+          letterSpacing: '0.1em'
+        }}>
+          <span className="text-neon-cyan">WAGER:</span> {formatEther(gameData.wagerAmount)}{' '}
+          <span className="text-neon-purple">{isNativeWager ? 'sFUEL' : 'ERC-20'}</span>
         </div>
       )}
 
+      {/* Winner Announcement */}
+      {gameData.state === 3 && (
+        <div className={`winner-announcement ${
+          gameData.winner.toLowerCase() === address?.toLowerCase() ? 'win' :
+          gameData.winner === '0x0000000000000000000000000000000000000000' ? 'draw' : 'lose'
+        }`}>
+          <span>{getWinnerText()}</span>
+        </div>
+      )}
+
+      {/* Reveal Section */}
       {isPlayer && gameData.state === 1 && !hasRevealed && (
-        <div className="reveal-section">
-          <h3>Reveal Your Move</h3>
-          <p>Enter your secret nonce to reveal your move:</p>
+        <div className="reveal-section stagger-in">
+          <h3>// REVEAL YOUR MOVE</h3>
+          <p style={{ color: 'hsla(180, 100%, 80%, 0.8)', marginBottom: '1rem' }}>
+            Enter your secret nonce to decrypt your move:
+          </p>
           <div className="form-group">
             <input
               type="text"
@@ -187,23 +233,27 @@ export default function GameView({ gameId, contractAddress, onClose }: GameViewP
             onClick={handleReveal}
             disabled={!nonce || isRevealingMove}
           >
-            {isRevealingMove ? 'Revealing...' : 'Reveal Move'}
+            {isRevealingMove ? '[ REVEALING... ]' : '[ REVEAL MOVE ]'}
           </button>
         </div>
       )}
 
+      {/* Claim Timeout */}
       {gameData.state !== 3 && gameData.state !== 4 && (
         <div style={{ marginTop: '2rem', textAlign: 'center' }}>
           <button
             className="action-btn"
             onClick={handleClaimTimeout}
             disabled={isClaiming}
-            style={{ background: 'rgba(244, 67, 54, 0.3)' }}
+            style={{
+              background: 'linear-gradient(135deg, hsla(320, 100%, 60%, 0.3), hsla(320, 100%, 60%, 0.2))',
+              border: '1px solid hsla(320, 100%, 60%, 0.4)'
+            }}
           >
-            {isClaiming ? 'Processing...' : 'Claim Timeout'}
+            {isClaiming ? '[ PROCESSING... ]' : '[ CLAIM TIMEOUT ]'}
           </button>
-          <p style={{ fontSize: '0.85rem', opacity: 0.7, marginTop: '0.5rem' }}>
-            Use this if the other player doesn't act within the time limit
+          <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.5rem', fontFamily: 'JetBrains Mono' }}>
+            Execute if opponent exceeds time limit
           </p>
         </div>
       )}

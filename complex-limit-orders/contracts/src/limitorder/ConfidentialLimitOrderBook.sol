@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../amm/interfaces/IBiteSwapV2Pair.sol";
 import "../amm/interfaces/IBiteSwapV2Factory.sol";
-import { Precompiled } from "../encryption/Precompiled.sol";
+import {Precompiled} from "../encryption/Precompiled.sol";
 import "./LimitOrderStructs.sol";
 
 contract ConfidentialLimitOrderBook is ReentrancyGuard {
@@ -233,7 +233,8 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
 
         // Submit CTX
         uint256 batchGasLimit = 500_000 * count + 100_000;
-        address payable ctxSender = Precompiled.submitCTX(address(0x1B), batchGasLimit, abi.encode(encryptedArgs), abi.encode(plaintextArgs));
+        address payable ctxSender =
+            Precompiled.submitCTX(address(0x1B), batchGasLimit, abi.encode(encryptedArgs), abi.encode(plaintextArgs));
 
         // Fund and mark orders
         _fundAndMarkOrders(orders, indicesToProcess, count, ctxSender);
@@ -246,12 +247,16 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
         LimitOrderStructs.LimitOrder[] storage orders,
         uint256[] memory orderIndices,
         uint256 indicesCount
-    ) internal view returns (
-        bytes[] memory encryptedArgs,
-        bytes[] memory plaintextArgs,
-        uint256[] memory indicesToProcess,
-        uint256 count
-    ) {
+    )
+        internal
+        view
+        returns (
+            bytes[] memory encryptedArgs,
+            bytes[] memory plaintextArgs,
+            uint256[] memory indicesToProcess,
+            uint256 count
+        )
+    {
         encryptedArgs = new bytes[](indicesCount * 2);
         plaintextArgs = new bytes[](indicesCount * 4);
         indicesToProcess = new uint256[](indicesCount);
@@ -262,7 +267,9 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
             LimitOrderStructs.LimitOrder storage order = orders[orderIdx];
 
             if (!canProcessOrder(order, pool)) {
-                unchecked { ++i; }
+                unchecked {
+                    ++i;
+                }
                 continue;
             }
 
@@ -275,7 +282,10 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
             plaintextArgs[pos * 4 + 3] = abi.encode(order.nonce);
             indicesToProcess[pos] = orderIdx;
 
-            unchecked { ++count; ++i; }
+            unchecked {
+                ++count;
+                ++i;
+            }
         }
     }
 
@@ -301,7 +311,9 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
                 clearOrderProcessing(order);
                 revert TransferFailed();
             }
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -313,7 +325,9 @@ contract ConfidentialLimitOrderBook is ReentrancyGuard {
 
         for (uint256 i = 0; i < orderCount;) {
             _processSingleOrder(decryptedArgs, plainArgs, i);
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
     }
 

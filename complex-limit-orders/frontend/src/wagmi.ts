@@ -3,28 +3,28 @@ import type { Chain } from "viem";
 import type { Config } from "wagmi";
 import { http } from "viem";
 
-// SKALE Testnet (base-sepolia)
+// SKALE Testnet (base-sepolia - miniature-live-tabit)
 // Fast block times with 250ms polling for rapid updates
 export const skaleTestnetChain = {
-  id: 103698795,
+  id: 2090472038,
   name: "SKALE Testnet",
   nativeCurrency: { name: "sFUEL", symbol: "sFUEL", decimals: 18 },
   rpcUrls: {
     public: {
       http: [
-        "https://base-sepolia-testnet.skalenodes.com/v1/fancy-this-usable-SKALE",
+        "https://base-sepolia-testnet.skalenodes.com/v1/miniature-live-tabit",
       ],
     },
     default: {
       http: [
-        "https://base-sepolia-testnet.skalenodes.com/v1/fancy-this-usable-SKALE",
+        "https://base-sepolia-testnet.skalenodes.com/v1/miniature-live-tabit",
       ],
     },
   },
   blockExplorers: {
     default: {
       name: "SKALE Explorer",
-      url: "https://base-sepolia-testnet-explorer.skalenodes.com:10032",
+      url: "https://base-sepolia-testnet-explorer.skalenodes.com",
     },
   },
   contracts: {},

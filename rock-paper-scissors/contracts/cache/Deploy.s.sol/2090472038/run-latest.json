@@ -1,0 +1,7 @@
+{
+  "transactions": [
+    {
+      "rpc": "https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox"
+    }
+  ]
+}

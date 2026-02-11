@@ -24,7 +24,7 @@ contract SendTokens is Script {
         MockToken(WBTC).transfer(recipient, 0.1 * 10 ** 8);
 
         // Send 50 ETH native (covers both ETH value + sFUEL gas on SKALE)
-        (bool success, ) = recipient.call{value: 50 ether}("");
+        (bool success,) = recipient.call{value: 50 ether}("");
         require(success, "Native transfer failed");
 
         vm.stopBroadcast();
