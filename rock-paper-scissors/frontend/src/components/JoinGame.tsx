@@ -81,8 +81,8 @@ export default function JoinGame({ contractAddress, onGameJoined }: JoinGameProp
     return encryptedMove
   }
 
-  // CTX gas payment amount (0.06 ETH)
-  const CTX_GAS_PAYMENT = BigInt(60000000000000000) // 0.06 ether
+  // CTX gas payment amount (0.06 ETH) - matches contract CTX_GAS_PAYMENT
+  const CTX_GAS_PAYMENT = BigInt(60000000000000000) // 0.06 ether for 2.5M gas limit
 
   const handleJoinGame = async () => {
     if (!selectedMove || !gameId || !wagerAmount || !tokenAddress) return
@@ -235,7 +235,7 @@ export default function JoinGame({ contractAddress, onGameJoined }: JoinGameProp
               <span className="text-neon-purple">{wagerFormatted} SKL</span>
             </div>
             <div className="flex justify-between mt-2">
-              <span style={{ color: 'hsla(280, 70%, 70%, 0.8)' }}>CTX Gas Fee:</span>
+              <span style={{ color: 'hsla(280, 70%, 70%, 0.8)' }}>CTX Gas (2.5M limit):</span>
               <span className="text-neon-cyan">0.06 ETH</span>
             </div>
           </div>

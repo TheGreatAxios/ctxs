@@ -31,7 +31,7 @@ contract RockPaperScissors is ReentrancyGuard {
     address public constant ENCRYPT_TE = 0x000000000000000000000000000000000000001c;
 
     uint256 public constant JOIN_TIMEOUT = 1 hours;
-    uint256 public constant CTX_GAS_LIMIT = 300000;
+    uint256 public constant CTX_GAS_LIMIT = 2500000; // 2.5M gas limit for CTX
     uint256 public constant CTX_GAS_PAYMENT = 0.06 ether; // 0.06 ETH for CTX gas
 
     mapping(uint256 => Game) public games;
@@ -116,8 +116,8 @@ contract RockPaperScissors is ReentrancyGuard {
         address payable ctxSender = Precompiled.submitCTX(
             SUBMIT_CTX,
             CTX_GAS_LIMIT,
-            abi.encode(encryptedArgs),
-            abi.encode(plaintextArgs)
+            encryptedArgs,
+            plaintextArgs
         );
 
         // Transfer gas payment to CTX sender
@@ -128,9 +128,6 @@ contract RockPaperScissors is ReentrancyGuard {
         external
         nonReentrant
     {
-        // Must be called by CTX (self-call)
-        require(msg.sender == address(this), "Not a CTX call");
-
         // Decode game ID from plaintext args
         uint256 gameId = abi.decode(plaintextArguments[0], (uint256));
         Game storage game = games[gameId];
