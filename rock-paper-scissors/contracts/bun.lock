@@ -1,0 +1,20 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "dependencies": {
+        "@skalenetwork/bite": "^0.7.1",
+      },
+    },
+  },
+  "packages": {
+    "@ethereumjs/rlp": ["@ethereumjs/rlp@10.0.0", "", { "bin": { "rlp": "bin/rlp.cjs" } }, "sha512-h2SK6RxFBfN5ZGykbw8LTNNLckSXZeuUZ6xqnmtF22CzZbHflFMcIOyfVGdvyCVQqIoSbGMHtvyxMCWnOyB9RA=="],
+
+    "@skalenetwork/bite": ["@skalenetwork/bite@0.7.1", "", { "dependencies": { "@ethereumjs/rlp": "10.0.0", "@skalenetwork/t-encrypt": "0.6.0-develop.0", "tslog": "^4.9.3" } }, "sha512-8YBmHEvqymCAqYahlI7oSezZjLkxmPNoRPFkzY/aXus/DR4fK+BMHzyAhax7cMfUO2ZHOBNkAQyMxDJ5yHRkrg=="],
+
+    "@skalenetwork/t-encrypt": ["@skalenetwork/t-encrypt@0.6.0-develop.0", "", {}, "sha512-9wStJn0IEHJ/FYP/go8EsgBXDLxM4E3EpsdiPRrdELXpmfwxIF/Q5BOlt00xu6I6rMb7xYqqvx9/OPImu9GQFg=="],
+
+    "tslog": ["tslog@4.10.2", "", {}, "sha512-XuELoRpMR+sq8fuWwX7P0bcj+PRNiicOKDEb3fGNURhxWVyykCi9BNq7c4uVz7h7P0sj8qgBsr5SWS6yBClq3g=="],
+  }
+}

@@ -1,17 +1,17 @@
 import { createConfig, http } from 'wagmi'
 import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors'
 
-// SKALE Testnet
+// SKALE BITE V2 Sandbox
 export const skaleTestnetChain = {
-  id: 103698795,
-  name: 'SKALE Testnet',
+  id: 2090472038,
+  name: 'SKALE BITE V2 Sandbox',
   nativeCurrency: { name: 'sFUEL', symbol: 'sFUEL', decimals: 18 },
   rpcUrls: {
     public: {
-      http: ['https://base-sepolia-testnet.skalenodes.com/v1/fancy-this-usable-SKALE'],
+      http: ['https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox'],
     },
     default: {
-      http: ['https://base-sepolia-testnet.skalenodes.com/v1/fancy-this-usable-SKALE'],
+      http: ['https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox'],
     },
   },
   blockExplorers: {
@@ -25,7 +25,7 @@ export const skaleTestnetChain = {
 
 export const chains = [skaleTestnetChain] as const
 
-const projectId = 'YOUR_WALLETCONNECT_PROJECT_ID'
+const projectId = 'ff97f5a8a4116c18b104556e8132dc37'
 
 export const config = createConfig({
   chains: [skaleTestnetChain],
@@ -41,7 +41,7 @@ export const config = createConfig({
     }),
   ],
   transports: {
-    [skaleTestnetChain.id]: http(),
+    [skaleTestnetChain.id]: http('https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox'),
   },
   ssr: true,
 })

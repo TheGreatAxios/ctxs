@@ -318,7 +318,7 @@ export function LimitOrderForm() {
       : (selectedToken?.symbol ?? "token");
   const inputTokenInfo = direction === "buy" ? otherToken : selectedToken;
 
-  const estimatedGas = BigInt("10000000000000000");
+  const estimatedGas = BigInt("6000000000000000");
 
   if (!factoryAddress) {
     return (

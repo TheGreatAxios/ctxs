@@ -1,12 +1,7 @@
 export const CONTRACT_ABI = [
   {
-    "inputs": [{ "internalType": "address", "name": "_feeRecipient", "type": "address" }],
-    "stateMutability": "nonpayable",
-    "type": "constructor"
-  },
-  {
     "inputs": [
-      { "internalType": "bytes32", "name": "_commitment", "type": "bytes32" },
+      { "internalType": "bytes", "name": "_encryptedMove", "type": "bytes" },
       { "internalType": "uint256", "name": "_wagerAmount", "type": "uint256" },
       { "internalType": "address", "name": "_wagerToken", "type": "address" }
     ],
@@ -18,22 +13,11 @@ export const CONTRACT_ABI = [
   {
     "inputs": [
       { "internalType": "uint256", "name": "_gameId", "type": "uint256" },
-      { "internalType": "bytes32", "name": "_commitment", "type": "bytes32" }
+      { "internalType": "bytes", "name": "_encryptedMove", "type": "bytes" }
     ],
     "name": "joinGame",
     "outputs": [],
     "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      { "internalType": "uint256", "name": "_gameId", "type": "uint256" },
-      { "internalType": "uint8", "name": "_move", "type": "uint8" },
-      { "internalType": "uint256", "name": "_nonce", "type": "uint256" }
-    ],
-    "name": "revealMove",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -50,37 +34,20 @@ export const CONTRACT_ABI = [
       "components": [
         { "internalType": "address", "name": "player1", "type": "address" },
         { "internalType": "address", "name": "player2", "type": "address" },
-        { "internalType": "bytes32", "name": "commitment1", "type": "bytes32" },
-        { "internalType": "bytes32", "name": "commitment2", "type": "bytes32" },
+        { "internalType": "bytes", "name": "encryptedMove1", "type": "bytes" },
+        { "internalType": "bytes", "name": "encryptedMove2", "type": "bytes" },
         { "internalType": "uint8", "name": "move1", "type": "uint8" },
         { "internalType": "uint8", "name": "move2", "type": "uint8" },
         { "internalType": "uint256", "name": "wagerAmount", "type": "uint256" },
         { "internalType": "address", "name": "wagerToken", "type": "address" },
-        { "internalType": "uint256", "name": "commitDeadline", "type": "uint256" },
-        { "internalType": "uint256", "name": "revealDeadline", "type": "uint256" },
         { "internalType": "uint8", "name": "state", "type": "uint8" },
-        { "internalType": "address", "name": "winner", "type": "address" },
-        { "internalType": "bool", "name": "player1Revealed", "type": "bool" },
-        { "internalType": "bool", "name": "player2Revealed", "type": "bool" }
+        { "internalType": "uint256", "name": "joinDeadline", "type": "uint256" },
+        { "internalType": "address", "name": "winner", "type": "address" }
       ],
       "internalType": "struct RockPaperScissors.Game",
       "name": "",
       "type": "tuple"
     }],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "COMMIT_TIMEOUT",
-    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "REVEAL_TIMEOUT",
-    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
     "stateMutability": "view",
     "type": "function"
   },
@@ -124,14 +91,16 @@ export const ERC20_ABI = [
   },
 ] as const
 
-// UPDATE THIS AFTER DEPLOYMENT
 export const CONTRACT_ADDRESS = {
-  103698795: '0xF6FdB8627203632FA6bA16aD7F22E21A900Dc505', // SKALE Testnet
+  2090472038: '0x9be779b1136e1f5f75edeb0469b74921c39f5167',
 } as const
 
-// Mock SKL Token - UPDATE THIS AFTER DEPLOYMENT
+// Mock SKL Token
 export const TOKEN_ADDRESS = {
-  103698795: '0x...', // SKALE Testnet - UPDATE AFTER DEPLOYMENT
+  2090472038: '0x8d4d0c04f45652dfc3ac95f9f0d4116bc0620f4f',
 } as const
 
 export const TOKEN_DECIMALS = 18
+
+// BITE V2 Precompile addresses
+export const ENCRYPT_TE_ADDRESS = '0x000000000000000000000000000000000000001C' as const

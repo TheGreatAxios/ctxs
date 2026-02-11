@@ -13,10 +13,11 @@ library Precompiled {
     function submitCTX(
         address submitCTXAddress,
         uint256 gasLimit,
-        bytes memory encryptedArgs,
-        bytes memory plaintextArgs
+        bytes[] memory encryptedArgs,
+        bytes[] memory plaintextArgs
     ) internal returns (address payable callbackSender) {
-        bytes memory input = abi.encode(gasLimit, abi.encode(encryptedArgs, plaintextArgs));
+        bytes memory ctxData = abi.encode(encryptedArgs, plaintextArgs);
+        bytes memory input = abi.encode(gasLimit, ctxData);
         (bool success, bytes memory returnData) = submitCTXAddress.staticcall(input);
         if (!success) revert PrecompiledCallFailed();
         if (returnData.length == 0) revert EmptyReturnData();

@@ -4,7 +4,9 @@
       "mcp__web-reader__webReader",
       "Bash(forge test:*)",
       "Bash(forge build:*)",
-      "Bash(forge fmt:*)"
+      "Bash(forge fmt:*)",
+      "Bash(forge verify-contract:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

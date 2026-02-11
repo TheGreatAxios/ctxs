@@ -11,7 +11,9 @@
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
     "@rainbow-me/rainbowkit": "^2.2.10",
+    "@skalenetwork/bite": "^0.8.0-develop.0",
     "@tanstack/react-query": "^5.90.20",
+    "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.563.0",

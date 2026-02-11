@@ -94,7 +94,7 @@ function App() {
               <div className="card text-center max-w-md">
                 <div className="text-5xl mb-4">⚠️</div>
                 <h2 className="text-neon-pink text-xl mb-2">UNSUPPORTED NETWORK</h2>
-                <p className="text-muted-foreground">Connect to SKALE Testnet (Chain ID: 103698795)</p>
+                <p className="text-muted-foreground">Connect to SKALE BITE V2 Sandbox (Chain ID: 2090472038)</p>
               </div>
             </div>
           )}

@@ -10,7 +10,7 @@
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.10",
     "@react-native-async-storage/async-storage": "^2.2.0",
-    "@skalenetwork/bite": "0.7.0-develop.4",
+    "@skalenetwork/bite": "^0.8.0-develop.0",
     "@tanstack/react-query": "^5.62.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

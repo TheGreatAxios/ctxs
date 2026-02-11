@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import { Precompiled } from "./encryption/Precompiled.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "./encryption/Precompiled.sol";
 
 contract RockPaperScissors is ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -13,215 +13,192 @@ contract RockPaperScissors is ReentrancyGuard {
     enum GameState { Created, Joined, Finished, Expired }
 
     struct Game {
-        uint256 id;
         address player1;
         address player2;
         bytes encryptedMove1;
         bytes encryptedMove2;
+        uint8 move1;
+        uint8 move2;
         uint256 wagerAmount;
         address wagerToken;
         GameState state;
-        bool resolved;
+        uint256 joinDeadline;
         address winner;
     }
 
-    uint256 public constant COMMIT_TIMEOUT = 5 minutes;
-    uint256 public constant CTX_GAS_COST = 0.006 ether;
+    // BITE V2 Precompile addresses
+    address public constant SUBMIT_CTX = 0x000000000000000000000000000000000000001B;
+    address public constant ENCRYPT_TE = 0x000000000000000000000000000000000000001c;
+
+    uint256 public constant JOIN_TIMEOUT = 1 hours;
+    uint256 public constant CTX_GAS_LIMIT = 300000;
 
     mapping(uint256 => Game) public games;
-    mapping(address => uint256) public userGasBalance;
     uint256 public nextGameId;
 
-    address public queuePlayer;
-    bytes public queueEncryptedMove;
-
-    event GameCreated(
-        uint256 indexed gameId,
-        address indexed player1,
-        uint256 wagerAmount,
-        address wagerToken
-    );
-    event GameJoined(
-        uint256 indexed gameId,
-        address indexed player1,
-        address indexed player2
-    );
-    event GameFinished(
-        uint256 indexed gameId,
-        address winner,
-        uint256 payout
-    );
-    event GameExpired(
-        uint256 indexed gameId,
-        address recipient,
-        uint256 refund
-    );
-    event GasDeposited(address indexed user, uint256 amount);
-    event GasWithdrawn(address indexed user, uint256 amount);
+    event GameCreated(uint256 indexed gameId, address indexed player, uint256 wagerAmount, address wagerToken);
+    event GameJoined(uint256 indexed gameId, address indexed player2, bytes encryptedMove);
+    event MovesDecrypted(uint256 indexed gameId, uint8 move1, uint8 move2);
+    event GameFinished(uint256 indexed gameId, address winner);
+    event GameExpired(uint256 indexed gameId);
 
     constructor() {}
 
-    // ============ Gas Management ============
-
-    function depositGas() external payable {
-        userGasBalance[msg.sender] += msg.value;
-        emit GasDeposited(msg.sender, msg.value);
-    }
-
-    function withdrawGas(uint256 amount) external nonReentrant {
-        if (userGasBalance[msg.sender] < amount) revert("Insufficient gas balance");
-        userGasBalance[msg.sender] -= amount;
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
-        if (!success) revert("Transfer failed");
-        emit GasWithdrawn(msg.sender, amount);
-    }
-
-    // ============ Game Logic ============
-
-    function createGame(
-        bytes calldata _encryptedMove,
-        uint256 _wagerAmount,
-        address _wagerToken
-    ) external payable nonReentrant returns (uint256 gameId) {
+    function createGame(bytes calldata _encryptedMove, uint256 _wagerAmount, address _wagerToken)
+        external
+        payable
+        nonReentrant
+        returns (uint256 gameId)
+    {
         require(_encryptedMove.length > 0, "Invalid encrypted move");
-        require(_wagerAmount == 0 || _wagerToken != address(0), "Invalid wager config");
 
         if (_wagerToken == address(0)) {
-            require(msg.value == _wagerAmount, "ETH amount mismatch");
+            require(msg.value == _wagerAmount, "ETH mismatch");
         } else {
-            require(msg.value == 0, "No ETH for ERC20 wager");
+            require(msg.value == 0, "No ETH for ERC20");
             IERC20(_wagerToken).safeTransferFrom(msg.sender, address(this), _wagerAmount);
         }
 
-        if (queuePlayer == address(0)) {
-            queuePlayer = msg.sender;
-            queueEncryptedMove = _encryptedMove;
-            gameId = nextGameId;
-            emit GameCreated(gameId, msg.sender, _wagerAmount, _wagerToken);
-        } else if (queuePlayer != msg.sender) {
-            gameId = nextGameId++;
+        gameId = nextGameId++;
+        games[gameId] = Game({
+            player1: msg.sender,
+            player2: address(0),
+            encryptedMove1: _encryptedMove,
+            encryptedMove2: "",
+            move1: 0,
+            move2: 0,
+            wagerAmount: _wagerAmount,
+            wagerToken: _wagerToken,
+            state: GameState.Created,
+            joinDeadline: block.timestamp + JOIN_TIMEOUT,
+            winner: address(0)
+        });
 
-            if (_wagerToken == address(0)) {
-                require(msg.value == _wagerAmount, "ETH amount mismatch");
-            } else {
-                IERC20(_wagerToken).safeTransferFrom(msg.sender, address(this), _wagerAmount);
-            }
+        emit GameCreated(gameId, msg.sender, _wagerAmount, _wagerToken);
+    }
 
-            games[gameId] = Game({
-                id: gameId,
-                player1: queuePlayer,
-                player2: msg.sender,
-                encryptedMove1: queueEncryptedMove,
-                encryptedMove2: _encryptedMove,
-                wagerAmount: _wagerAmount,
-                wagerToken: _wagerToken,
-                state: GameState.Joined,
-                resolved: false,
-                winner: address(0)
-            });
+    function joinGame(uint256 _gameId, bytes calldata _encryptedMove)
+        external
+        payable
+        nonReentrant
+    {
+        Game storage game = games[_gameId];
+        require(game.player1 != address(0), "Game not found");
+        require(game.player2 == address(0), "Game full");
+        require(game.state == GameState.Created, "Invalid state");
+        require(block.timestamp <= game.joinDeadline, "Expired");
+        require(_encryptedMove.length > 0, "Invalid encrypted move");
 
-            emit GameJoined(gameId, queuePlayer, msg.sender);
-
-            delete queuePlayer;
-            delete queueEncryptedMove;
-
-            _submitCtx(gameId);
+        if (game.wagerToken == address(0)) {
+            require(msg.value == game.wagerAmount, "ETH mismatch");
         } else {
-            revert("Cannot play against yourself");
+            require(msg.value == 0, "No ETH for ERC20");
+            IERC20(game.wagerToken).safeTransferFrom(msg.sender, address(this), game.wagerAmount);
         }
+
+        game.player2 = msg.sender;
+        game.encryptedMove2 = _encryptedMove;
+        game.state = GameState.Joined;
+
+        emit GameJoined(_gameId, msg.sender, _encryptedMove);
+
+        // Submit CTX to decrypt both moves
+        _submitDecryptCTX(_gameId);
     }
 
-    function leaveQueue() external {
-        if (queuePlayer != msg.sender) revert("Not in queue");
-        delete queuePlayer;
-        delete queueEncryptedMove;
-    }
-
-    function _submitCtx(uint256 _gameId) internal {
-        if (userGasBalance[games[_gameId].player1] < CTX_GAS_COST) revert("Insufficient gas balance");
-
+    function _submitDecryptCTX(uint256 _gameId) internal {
         Game storage game = games[_gameId];
 
+        // Prepare encrypted args (both moves)
         bytes[] memory encryptedArgs = new bytes[](2);
         encryptedArgs[0] = game.encryptedMove1;
         encryptedArgs[1] = game.encryptedMove2;
 
+        // Prepare plaintext args (game ID for callback)
         bytes[] memory plaintextArgs = new bytes[](1);
         plaintextArgs[0] = abi.encode(_gameId);
 
-        uint256 gasLimit = 300_000;
-
+        // Get CTX sender address to top up
         address payable ctxSender = Precompiled.submitCTX(
-            address(0x1B),
-            gasLimit,
+            SUBMIT_CTX,
+            CTX_GAS_LIMIT,
             abi.encode(encryptedArgs),
             abi.encode(plaintextArgs)
         );
 
-        userGasBalance[game.player1] -= CTX_GAS_COST;
-        (bool sent, ) = ctxSender.call{value: CTX_GAS_COST}("");
-        if (!sent) {
-            userGasBalance[game.player1] += CTX_GAS_COST;
-            revert("CTX funding failed");
+        // Transfer ETH to CTX sender for gas
+        uint256 gasCost = CTX_GAS_LIMIT * tx.gasprice;
+        if (gasCost > 0) {
+            payable(ctxSender).transfer(gasCost);
         }
     }
 
-    function onDecrypt(bytes[] calldata decryptedArgs, bytes[] calldata plainArgs) external nonReentrant {
-        require(decryptedArgs.length == 2, "Invalid decrypted args");
-        require(plainArgs.length == 1, "Invalid plain args");
+    function onDecrypt(bytes[] calldata decryptedArguments, bytes[] calldata plaintextArguments)
+        external
+        nonReentrant
+    {
+        // Must be called by CTX (self-call)
+        require(msg.sender == address(this), "Not a CTX call");
 
-        uint256 gameId = abi.decode(plainArgs[0], (uint256));
+        // Decode game ID from plaintext args
+        uint256 gameId = abi.decode(plaintextArguments[0], (uint256));
         Game storage game = games[gameId];
 
-        if (game.id != gameId || game.resolved) revert("Game not found");
+        require(game.player1 != address(0), "Game not found");
+        require(game.state == GameState.Joined, "Invalid state");
 
-        uint8 move1Value = uint8(uint256(bytes32(decryptedArgs[0])));
-        uint8 move2Value = uint8(uint256(bytes32(decryptedArgs[1])));
+        // Decrypt moves from BITE
+        game.move1 = uint8(bytes1(decryptedArguments[0]));
+        game.move2 = uint8(bytes1(decryptedArguments[1]));
 
-        require(move1Value >= 1 && move1Value <= 3, "Invalid move 1");
-        require(move2Value >= 1 && move2Value <= 3, "Invalid move 2");
+        require(game.move1 >= 1 && game.move1 <= 3, "Invalid move1");
+        require(game.move2 >= 1 && game.move2 <= 3, "Invalid move2");
 
-        Move move1 = Move(move1Value);
-        Move move2 = Move(move2Value);
+        emit MovesDecrypted(gameId, game.move1, game.move2);
 
-        game.winner = _determineWinner(move1, move2);
-        game.resolved = true;
-        game.state = GameState.Finished;
-
-        uint256 totalPot = game.wagerAmount * 2;
-
-        if (game.winner == address(1)) {
-            _transferPayout(game.player1, totalPot, game.wagerToken);
-            emit GameFinished(gameId, game.player1, totalPot);
-        } else if (game.winner == address(2)) {
-            _transferPayout(game.player2, totalPot, game.wagerToken);
-            emit GameFinished(gameId, game.player2, totalPot);
-        } else {
-            _refundPlayer(game.player1, game.wagerAmount, game.wagerToken);
-            _refundPlayer(game.player2, game.wagerAmount, game.wagerToken);
-            emit GameFinished(gameId, address(0), 0);
-        }
-
-        uint256 remainingGas = address(this).balance;
-        if (remainingGas > 0 && userGasBalance[game.player1] > 0) {
-            uint256 refund = remainingGas > userGasBalance[game.player1] ? remainingGas : userGasBalance[game.player1];
-            (bool sent, ) = payable(game.player1).call{value: refund}("");
-            if (sent) {
-                userGasBalance[game.player1] = 0;
-            }
-        }
+        // Resolve game
+        _resolveGame(gameId);
     }
 
-    function _determineWinner(Move _move1, Move _move2) internal pure returns (address) {
-        if (_move1 == _move2) return address(0);
-        if (
-            (_move1 == Move.Rock && _move2 == Move.Scissors) ||
-            (_move1 == Move.Paper && _move2 == Move.Rock) ||
-            (_move1 == Move.Scissors && _move2 == Move.Paper)
+    function _resolveGame(uint256 _gameId) internal {
+        Game storage game = games[_gameId];
+
+        Move move1 = Move(game.move1);
+        Move move2 = Move(game.move2);
+
+        if (move1 == move2) {
+            // Draw - refund both
+            game.winner = address(0);
+            _refundPlayer(game.player1, game.wagerAmount, game.wagerToken);
+            _refundPlayer(game.player2, game.wagerAmount, game.wagerToken);
+        } else if (
+            (move1 == Move.Rock && move2 == Move.Scissors) ||
+            (move1 == Move.Paper && move2 == Move.Rock) ||
+            (move1 == Move.Scissors && move2 == Move.Paper)
         ) {
-            return address(1);
+            // Player 1 wins
+            game.winner = game.player1;
+            _transferPayout(game.player1, game.wagerAmount * 2, game.wagerToken);
+        } else {
+            // Player 2 wins
+            game.winner = game.player2;
+            _transferPayout(game.player2, game.wagerAmount * 2, game.wagerToken);
         }
-        return address(2);
+
+        game.state = GameState.Finished;
+        emit GameFinished(_gameId, game.winner);
+    }
+
+    function claimTimeout(uint256 _gameId) external nonReentrant {
+        Game storage game = games[_gameId];
+        require(game.player1 != address(0), "Game not found");
+
+        if (game.state == GameState.Created && block.timestamp > game.joinDeadline) {
+            // No one joined, refund player1
+            _refundPlayer(game.player1, game.wagerAmount, game.wagerToken);
+            game.state = GameState.Expired;
+            emit GameExpired(_gameId);
+        }
     }
 
     function _transferPayout(address _to, uint256 _amount, address _token) internal {
@@ -240,24 +217,11 @@ contract RockPaperScissors is ReentrancyGuard {
         }
     }
 
-    // ============ View Functions ============
-
     function getGame(uint256 _gameId) external view returns (Game memory) {
         return games[_gameId];
     }
 
-    function getCurrentQueue() external view returns (address player, bytes memory encryptedMove) {
-        return (queuePlayer, queueEncryptedMove);
-    }
-
-    function isPlayerInQueue(address _player) external view returns (bool) {
-        return queuePlayer == _player;
-    }
-
-    // ============ Fallback ============
-
-    receive() external payable {
-        userGasBalance[msg.sender] += msg.value;
-        emit GasDeposited(msg.sender, msg.value);
-    }
+    // Allow contract to receive ETH for CTX gas
+    receive() external payable {}
+    fallback() external payable {}
 }

@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@skalenetwork/bite": "^0.7.1"
+  }
+}

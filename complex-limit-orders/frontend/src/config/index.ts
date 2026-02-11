@@ -2,7 +2,7 @@
  * UNIFIED CONFIG - Single source of truth for all addresses
  *
  * SKALE Testnet - Chain ID: 2090472038
- * Deployed: Feb 2026
+ * Deployed: Feb 11, 2026
  */
 
 import type { Address } from "viem";
@@ -24,12 +24,12 @@ export const CHAIN_ID = 2090472038 as const;
 
 // SKALE BITE V2 Precompiles (fixed across all SKALE chains)
 export const PRECOMPILES = {
-  encryptTE: "0x0000000000000000000000000000000000001002" as Address,
-  submitCTX: "0x0000000000000000000000000000000000001001" as Address,
-  encryptECIES: "0x0000000000000000000000000000000000001003" as Address,
+  encryptTE: "0x000000000000000000000000000000000000001c" as Address,
+  submitCTX: "0x000000000000000000000000000000000000001b" as Address,
+  encryptECIES: "0x000000000000000000000000000000000000001d" as Address,
 } as const;
 
-export const CTX_GAS_COST = BigInt("10000000000000000") as bigint; // 0.01 sFUEL
+export const CTX_GAS_COST = BigInt("6000000000000000") as bigint; // 0.006 sFUEL
 
 // ============================================================================
 // TOKENS
@@ -37,28 +37,28 @@ export const CTX_GAS_COST = BigInt("10000000000000000") as bigint; // 0.01 sFUEL
 
 export const TOKENS: Record<string, TokenInfo> = {
   USDC: {
-    address: "0x6a971D20050B01F61ad7F01975862Fe8307CbD70" as Address,
+    address: "0x22e20f17CE178b6EA689D6eed46E745843E8418C" as Address,
     symbol: "USDC",
     name: "USD Coin",
     decimals: 6,
     coinbaseId: "usd-coin",
   },
   USDT: {
-    address: "0xc7B8baBCf3EFee8232326BBB1f6d70E848202Fd5" as Address,
+    address: "0xd62bD274e8Ea0f4BDdecd47f908891636498692d" as Address,
     symbol: "USDT",
     name: "Tether USD",
     decimals: 6,
     coinbaseId: "tether",
   },
   WBTC: {
-    address: "0x1aCe30D4d6db097D4943B322FeB6678Fd485b8D4" as Address,
+    address: "0x3b0961D397487c006E6e0Ba1624667376c180eD3" as Address,
     symbol: "WBTC",
     name: "Wrapped BTC",
     decimals: 8,
     coinbaseId: "wrapped-bitcoin",
   },
   WETH: {
-    address: "0x7bb4533a19AdaBEea20a031a6539a7FfDD92bfa7" as Address,
+    address: "0x7Aa56c756336Cea83439Da502005306B11ba7Dca" as Address,
     symbol: "WETH",
     name: "Wrapped Ether",
     decimals: 18,
@@ -76,11 +76,11 @@ export const TOKEN_BY_ADDRESS = Object.fromEntries(
 // ============================================================================
 
 export const PAIRS = {
-  USDC_WETH: "0x6b824D9258559f7aEe08a1A660fFF3E2fE50F998" as Address,
-  USDC_WBTC: "0x23cB1aF49df2633CcF05F56Bb4819D507CFbA816" as Address,
-  USDT_WETH: "0x6DCfB3f58a35a4cf9D4a9a1Fc8122f71c6F73fa9" as Address,
-  USDT_WBTC: "0xE6559C73F066435fE6585c5c54D29cDB210d6026" as Address,
-  WETH_WBTC: "0x51CE5F8c5fE10E5fCE88f09B71a248a416c95C99" as Address,
+  USDC_WETH: "0xC045D848099Eca36F4dc6a29a8a4EBdb410dDBfE" as Address,
+  USDC_WBTC: "0x041DB6A9670c6E7c67F0aB7048919ee172a8a535" as Address,
+  USDT_WETH: "0x1EBfe770c3a5F9937E2b92e4463adcA05D6A45f8" as Address,
+  USDT_WBTC: "0xB7509874da597218AD2338d7C91346Db64C9dAbD" as Address,
+  WETH_WBTC: "0x10b8CD650cADfde9bb8058124328dAe5C17BF49e" as Address,
 } as const;
 
 // Pool name mapping (lowercase keys for consistent matching)
@@ -102,14 +102,14 @@ export const TOKEN_ADDRESS_BY_SYMBOL = Object.fromEntries(
 // ============================================================================
 
 export const CONTRACTS = {
-  factory: "0x275FB869d44c60Cf0164497A1418e739896B1CEF" as Address,
-  router: "0xBf54f55B610bE6CC6E4C9e8297D7Ed1229763f05" as Address,
-  limitOrderBook: "0xefBBc70De8d19085bf2Ba6828541c6A429F2eB25" as Address,
+  factory: "0x2452e6e6925f96A45d331AD4deaa5b8eDf0b7276" as Address,
+  router: "0xD09c0D61E6E3334c6c1de06793830490C832d435" as Address,
+  limitOrderBook: "0x55d3289188f17Eb6002363Ef37fEa9B2686959Aa" as Address,
 
   // Generic CTX system
-  conditionalTransactionBook: "0x228AA4304b11e2EFfc37c7c4869F23aD13bE64da" as Address,
-  ammPriceConditionChecker: "0xB0A62b172482eBe67fFd7B9fE0901dcC012E936B" as Address,
-  ammSwapActionExecutor: "0x5675039d81519e6c5D3529e5485b4c237E49d7c9" as Address,
+  conditionalTransactionBook: "0xe1a3066Bc0Ae57e2b7A8C46599a457f78E178376" as Address,
+  ammPriceConditionChecker: "0x0702948949cE00d8683045F0Eab8Ec9478b37e42" as Address,
+  ammSwapActionExecutor: "0x9dcd58ea3981222e421786485a2152Ef9fe7F49f" as Address,
 } as const;
 
 // ============================================================================

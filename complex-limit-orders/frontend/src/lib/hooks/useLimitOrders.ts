@@ -9,6 +9,7 @@ import type { Address } from "viem";
 import { toBytes, toHex, keccak256, encodeAbiParameters, parseAbiParameters } from "viem";
 import { useState, useEffect, useMemo } from "react";
 import { encryptTE } from "../bite/encryption";
+import { CONTRACTS } from "../../config";
 import { useTxReceipt } from "./useTxReceipt";
 import ConfidentialLimitOrderBookABI from "../../../abi/ConfidentialLimitOrderBook.json";
 
@@ -75,9 +76,10 @@ export function useCreateLimitOrder() {
 
     try {
       // Encrypt sensitive data using threshold encryption
+      const ctbAddress = CONTRACTS.conditionalTransactionBook;
       const [encryptedTargetPrice, encryptedAmount] = await Promise.all([
-        encryptTE(toBytes(params.targetPrice), rpcUrl),
-        encryptTE(toBytes(params.amount), rpcUrl),
+        encryptTE(toBytes(params.targetPrice, { size: 32 }), rpcUrl, ctbAddress),
+        encryptTE(toBytes(params.amount, { size: 32 }), rpcUrl, ctbAddress),
       ]);
 
       setIsEncrypting(false);

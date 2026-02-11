@@ -7,7 +7,7 @@
       "dependencies": {
         "@rainbow-me/rainbowkit": "^2.2.10",
         "@react-native-async-storage/async-storage": "^2.2.0",
-        "@skalenetwork/bite": "0.7.0-develop.4",
+        "@skalenetwork/bite": "^0.8.0-develop.0",
         "@tanstack/react-query": "^5.62.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
@@ -144,7 +144,7 @@
 
     "@ethereumjs/common": ["@ethereumjs/common@3.2.0", "", { "dependencies": { "@ethereumjs/util": "^8.1.0", "crc-32": "^1.2.0" } }, "sha512-pksvzI0VyLgmuEF2FA/JR/4/y6hcPq8OUail3/AvycBaW1d5VSauOZzqGvJ3RTmR4MU35lWE8KseKOsEhrFRBA=="],
 
-    "@ethereumjs/rlp": ["@ethereumjs/rlp@10.1.1", "", { "bin": { "rlp": "bin/rlp.cjs" } }, "sha512-jbnWTEwcpoY+gE0r+wxfDG9zgiu54DcTcwnc9sX3DsqKR4l5K7x2V8mQL3Et6hURa4DuT9g7z6ukwpBLFchszg=="],
+    "@ethereumjs/rlp": ["@ethereumjs/rlp@10.0.0", "", { "bin": { "rlp": "bin/rlp.cjs" } }, "sha512-h2SK6RxFBfN5ZGykbw8LTNNLckSXZeuUZ6xqnmtF22CzZbHflFMcIOyfVGdvyCVQqIoSbGMHtvyxMCWnOyB9RA=="],
 
     "@ethereumjs/tx": ["@ethereumjs/tx@4.2.0", "", { "dependencies": { "@ethereumjs/common": "^3.2.0", "@ethereumjs/rlp": "^4.0.1", "@ethereumjs/util": "^8.1.0", "ethereum-cryptography": "^2.0.0" } }, "sha512-1nc6VO4jtFd172BbSnTnDQVr9IYBFl1y4xPzZdtkrkKIncBCkdbgfdRV+MiTkJYAtTxvV12GRZLqBFT1PNK6Yw=="],
 
@@ -378,9 +378,9 @@
 
     "@sinonjs/fake-timers": ["@sinonjs/fake-timers@10.3.0", "", { "dependencies": { "@sinonjs/commons": "^3.0.0" } }, "sha512-V4BG07kuYSUkTCSBHG8G8TNhM+F19jXFWnQtzj+we8DrkpSBCee9Z3Ms8yiGer/dlmhe35/Xdgyo3/0rQKg7YA=="],
 
-    "@skalenetwork/bite": ["@skalenetwork/bite@0.7.0-develop.4", "", { "dependencies": { "@ethereumjs/rlp": "^10.0.0", "@skalenetwork/t-encrypt": "0.6.0-develop.0", "tslog": "^4.9.3" } }, "sha512-N78GIzlOTq035XexHa6HT0aoenIX7znVKn463R3w+fegGdnsqHWzVVxlWGfphRt+/8w2jZ5x3wtsJpYSrWc0yQ=="],
+    "@skalenetwork/bite": ["@skalenetwork/bite@0.8.0-develop.0", "", { "dependencies": { "@ethereumjs/rlp": "10.0.0", "@skalenetwork/t-encrypt": "0.7.0-develop.0", "tslog": "^4.9.3" } }, "sha512-at1m4HgSlobD7jyDBv3ouUXVAONX4grCXQuJ2G1CCN8KMy626cSFE4CmBNYUQFjgimYf18nWkhfZgmHc9PcVPg=="],
 
-    "@skalenetwork/t-encrypt": ["@skalenetwork/t-encrypt@0.6.0-develop.0", "", {}, "sha512-9wStJn0IEHJ/FYP/go8EsgBXDLxM4E3EpsdiPRrdELXpmfwxIF/Q5BOlt00xu6I6rMb7xYqqvx9/OPImu9GQFg=="],
+    "@skalenetwork/t-encrypt": ["@skalenetwork/t-encrypt@0.7.0-develop.0", "", {}, "sha512-p8aZXVkijO57ScY05yYXyXLj7dF72ChHxHK3U+HMX/ilLufkPtx8gWFfg8ltvKUcJe9GDnVKw/VeF/tfhaiWJg=="],
 
     "@socket.io/component-emitter": ["@socket.io/component-emitter@3.1.2", "", {}, "sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA=="],
 

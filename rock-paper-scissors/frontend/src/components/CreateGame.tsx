@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
-import { useWriteContract, useReadContract, useAccount } from 'wagmi'
-import { parseEther, keccak256, encodePacked } from 'viem'
-import { Gauge, File, Scissors, Wallet } from 'lucide-react'
+import { useState } from 'react'
+import { useWriteContract, useReadContract, useAccount, usePublicClient } from 'wagmi'
+import { parseEther } from 'viem'
+import { Mountain, File, Scissors, Wallet } from 'lucide-react'
 import { CONTRACT_ABI, TOKEN_ADDRESS, ERC20_ABI } from '../config/contract'
+import { BITE } from '@skalenetwork/bite'
 
-type Move = 0 | 1 | 2 | 3
+type Move = 1 | 2 | 3
 
 interface CreateGameProps {
   contractAddress: string
@@ -12,13 +13,13 @@ interface CreateGameProps {
 
 export default function CreateGame({ contractAddress }: CreateGameProps) {
   const { address, chainId } = useAccount()
+  const publicClient = usePublicClient()
   const [selectedMove, setSelectedMove] = useState<Move | null>(null)
   const [wagerAmount, setWagerAmount] = useState('')
-  const [nonce, setNonce] = useState<bigint | null>(null)
-  const [showNonce, setShowNonce] = useState(false)
+  const [isEncrypting, setIsEncrypting] = useState(false)
+  const [isApproving, setIsApproving] = useState(false)
 
-  const { writeContract: createGame, isPending: isCreating, error } = useWriteContract()
-  const { writeContract: approveToken, isPending: isApproving } = useWriteContract()
+  const { writeContract, isPending, error } = useWriteContract()
 
   // Get token balance
   const { data: balance } = useReadContract({
@@ -39,49 +40,66 @@ export default function CreateGame({ contractAddress }: CreateGameProps) {
   const tokenAddress = chainId ? TOKEN_ADDRESS[chainId as keyof typeof TOKEN_ADDRESS] : undefined
 
   const moves: { value: Move; icon: any; label: string }[] = [
-    { value: 1, icon: Gauge, label: 'ROCK' },
+    { value: 1, icon: Mountain, label: 'ROCK' },
     { value: 2, icon: File, label: 'PAPER' },
     { value: 3, icon: Scissors, label: 'SCISSORS' },
   ]
 
-  const generateCommitment = (move: Move, nonceValue: bigint): `0x${string}` => {
-    return keccak256(encodePacked(['uint8', 'uint256'], [move, nonceValue]))
+  // Encrypt move using BITE V2
+  const encryptMove = async (move: Move): Promise<string> => {
+    const moveHex = move.toString(16).padStart(2, '0')
+    const rpcUrl = 'https://base-sepolia-testnet.skalenodes.com/v1/bite-v2-sandbox'
+    const bite = new BITE(rpcUrl)
+    const encryptedMove = await bite.encryptMessage(moveHex)
+    return encryptedMove
   }
 
-  const handleApprove = () => {
-    if (!tokenAddress) return
-    // Approve maximum uint256 for convenience
-    approveToken({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: 'approve',
-      args: [contractAddress as `0x${string}`, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')],
-    })
-  }
-
-  const handleCreateGame = () => {
+  const handleCreateGame = async () => {
     if (!selectedMove || !tokenAddress) return
 
-    const nonceValue = BigInt(Math.floor(Math.random() * 1000000000000))
-    setNonce(nonceValue)
-
-    const commitment = generateCommitment(selectedMove, nonceValue)
     const amount = wagerAmount ? parseEther(wagerAmount) : BigInt(0)
+    const needsApproval = allowance !== undefined && amount > (allowance || 0n)
 
-    createGame({
-      address: contractAddress as `0x${string}`,
-      abi: CONTRACT_ABI,
-      functionName: 'createGame',
-      args: [commitment, amount, tokenAddress],
-      value: BigInt(0),
-    })
+    try {
+      if (needsApproval) {
+        setIsApproving(true)
+        const hash = await writeContract({
+          address: tokenAddress,
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [contractAddress as `0x${string}`, amount],
+        })
+        setIsApproving(false)
+        // Wait for approval to confirm
+        if (hash && publicClient) {
+          await publicClient.waitForTransactionReceipt({ hash })
+          // Refetch allowance after approval confirms
+          await refetchAllowance()
+        }
+      }
 
-    setShowNonce(true)
+      // Encrypt and create game
+      setIsEncrypting(true)
+      const encryptedMove = await encryptMove(selectedMove)
+      setIsEncrypting(false)
+
+      writeContract({
+        address: contractAddress as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'createGame',
+        args: [encryptedMove as `0x${string}`, amount, tokenAddress as `0x${string}`],
+        value: BigInt(0),
+      })
+    } catch (e) {
+      console.error('Error:', e)
+      setIsApproving(false)
+      setIsEncrypting(false)
+    }
   }
 
-  const needsApproval = wagerAmount && allowance && balance
-    ? parseEther(wagerAmount) > allowance
-    : false
+  const needsApproval = wagerAmount && allowance !== undefined && balance !== undefined
+    ? parseEther(wagerAmount) > (allowance || 0n)
+    : wagerAmount !== ''
 
   const balanceFormatted = balance ? (Number(balance) / 1e18).toFixed(2) : '0.00'
   const allowanceFormatted = allowance ? (Number(allowance) / 1e18).toFixed(2) : '0.00'
@@ -117,7 +135,7 @@ export default function CreateGame({ contractAddress }: CreateGameProps) {
       </div>
 
       <div className="form-group">
-        <label>Select Your Move <span className="text-neon-purple">(ENCRYPTED)</span></label>
+        <label>Select Your Move <span className="text-neon-purple">(ENCRYPTED VIA BITE)</span></label>
         <div className="move-selection">
           {moves.map((move, index) => {
             const Icon = move.icon
@@ -148,41 +166,13 @@ export default function CreateGame({ contractAddress }: CreateGameProps) {
         />
       </div>
 
-      {/* Approve Button */}
-      {needsApproval && (
-        <button
-          className="action-btn"
-          onClick={handleApprove}
-          disabled={isApproving}
-          style={{
-            background: 'linear-gradient(135deg, hsla(140, 100%, 55%, 0.8), hsla(140, 100%, 45%, 0.8))',
-            marginBottom: '1rem',
-          }}
-        >
-          {isApproving ? '[ APPROVING... ]' : '[ APPROVE SKL ]'}
-        </button>
-      )}
-
       <button
         className="action-btn"
         onClick={handleCreateGame}
-        disabled={!selectedMove || isCreating || needsApproval}
+        disabled={!selectedMove || isPending || isEncrypting || isApproving}
       >
-        {isCreating ? '[ INITIALIZING... ]' : '[ CREATE GAME ]'}
+        {isApproving ? '[ APPROVING... ]' : isEncrypting ? '[ ENCRYPTING... ]' : isPending ? '[ CREATING... ]' : '[ CREATE GAME ]'}
       </button>
-
-      {showNonce && nonce && (
-        <div className="reveal-section stagger-in">
-          <h3>// SAVE YOUR SECRET</h3>
-          <p style={{ color: 'hsla(180, 100%, 80%, 0.8)', marginBottom: '1rem' }}>
-            Store this nonce securely to reveal your move:
-          </p>
-          <div className="nonce-display">{nonce.toString()}</div>
-          <p style={{ fontSize: '0.8rem', marginTop: '0.75rem', color: 'hsla(320, 100%, 70%, 0.9)' }}>
-            ⚠ WARNING: Without this nonce, you cannot reveal your move
-          </p>
-        </div>
-      )}
 
       {error && (
         <div className="error-message">

@@ -263,7 +263,7 @@ contract ConditionalTransactionBook is ReentrancyGuard {
         // Submit CTX
         uint256 batchGasLimit = 500_000 * count + 100_000;
         address payable ctxSender =
-            Precompiled.submitCTX(address(0x1B), batchGasLimit, abi.encode(encryptedArgs), abi.encode(plaintextArgs));
+            Precompiled.submitCTX(address(0x1B), batchGasLimit, encryptedArgs, plaintextArgs);
 
         // Fund CTX sender
         _fundCtxTxs(txs, indicesToProcess, count, ctxSender);

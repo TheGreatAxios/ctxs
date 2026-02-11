@@ -1,7 +1,6 @@
-import { useState } from 'react'
-import { useAccount, useReadContract, useWriteContract } from 'wagmi'
+import { useAccount, useReadContract } from 'wagmi'
 import { formatEther } from 'viem'
-import { ArrowLeft, Gauge, File, Scissors, Lock } from 'lucide-react'
+import { ArrowLeft, Mountain, File, Scissors, Lock, Zap } from 'lucide-react'
 import { CONTRACT_ABI } from '../config/contract'
 
 interface GameViewProps {
@@ -13,45 +12,40 @@ interface GameViewProps {
 interface GameData {
   player1: string
   player2: string
-  commitment1: string
-  commitment2: string
+  encryptedMove1: string
+  encryptedMove2: string
   move1: number
   move2: number
   wagerAmount: bigint
   wagerToken: string
-  commitDeadline: bigint
-  revealDeadline: bigint
   state: number
   winner: string
-  player1Revealed: boolean
-  player2Revealed: boolean
 }
 
 const moveIcons: Record<number, any> = {
   0: Lock,
-  1: Gauge,
+  1: Mountain,
   2: File,
   3: Scissors,
 }
 
 const moveNames: Record<number, string> = {
-  0: 'HIDDEN',
+  0: 'ENCRYPTED',
   1: 'ROCK',
   2: 'PAPER',
   3: 'SCISSORS',
 }
 
 const stateLabels: Record<number, string> = {
-  0: 'AWAITING PLAYER 2',
-  1: 'REVEAL PHASE',
-  2: 'REVEALING',
+  0: 'WAITING FOR PLAYER 2',
+  1: 'DECRYPTING...',
+  2: 'REVEALED',
   3: 'GAME OVER',
   4: 'EXPIRED',
 }
 
 export default function GameView({ gameId, contractAddress, onClose }: GameViewProps) {
   const { address } = useAccount()
-  const [nonce, setNonce] = useState('')
 
   const { data: game } = useReadContract({
     address: contractAddress as `0x${string}`,
@@ -60,34 +54,7 @@ export default function GameView({ gameId, contractAddress, onClose }: GameViewP
     args: [BigInt(gameId)],
   })
 
-  const { writeContract: revealMove, isPending: isRevealingMove } = useWriteContract()
-  const { writeContract: claimTimeout, isPending: isClaiming } = useWriteContract()
-
   const gameData = game as GameData | undefined
-  const isPlayer1 = address?.toLowerCase() === gameData?.player1.toLowerCase()
-  const isPlayer2 = address?.toLowerCase() === gameData?.player2.toLowerCase()
-  const isPlayer = isPlayer1 || isPlayer2
-  const hasRevealed = isPlayer1 ? gameData?.player1Revealed : gameData?.player2Revealed
-
-  const handleReveal = () => {
-    if (!nonce || !isPlayer) return
-
-    revealMove({
-      address: contractAddress as `0x${string}`,
-      abi: CONTRACT_ABI,
-      functionName: 'revealMove',
-      args: [BigInt(gameId), isPlayer1 ? gameData?.move1 || 1 : gameData?.move2 || 1, BigInt(nonce)],
-    })
-  }
-
-  const handleClaimTimeout = () => {
-    claimTimeout({
-      address: contractAddress as `0x${string}`,
-      abi: CONTRACT_ABI,
-      functionName: 'claimTimeout',
-      args: [BigInt(gameId)],
-    })
-  }
 
   const getWinnerText = () => {
     if (!gameData) return ''
@@ -117,7 +84,6 @@ export default function GameView({ gameId, contractAddress, onClose }: GameViewP
   }
 
   const hasWager = gameData.wagerAmount > 0n
-  const isNativeWager = gameData.wagerToken === '0x0000000000000000000000000000000000000000'
 
   return (
     <div className="card" style={{ gridColumn: '1 / -1' }}>
@@ -152,11 +118,6 @@ export default function GameView({ gameId, contractAddress, onClose }: GameViewP
             {moveNames[gameData.move1]}
           </div>
           <div className="player-address">{gameData.player1.slice(0, 8)}...</div>
-          {gameData.player1Revealed && (
-            <span style={{ color: 'hsl(var(--color-neon-green))', fontSize: '0.7rem', fontWeight: '700' }}>
-              ✓ REVEALED
-            </span>
-          )}
         </div>
 
         <div className="player-box">
@@ -173,19 +134,12 @@ export default function GameView({ gameId, contractAddress, onClose }: GameViewP
               : moveNames[gameData.move2]}
           </div>
           {gameData.player2 !== '0x0000000000000000000000000000000000000000' && (
-            <>
-              <div className="player-address">{gameData.player2.slice(0, 8)}...</div>
-              {gameData.player2Revealed && (
-                <span style={{ color: 'hsl(var(--color-neon-green))', fontSize: '0.7rem', fontWeight: '700' }}>
-                  ✓ REVEALED
-                </span>
-              )}
-            </>
+            <div className="player-address">{gameData.player2.slice(0, 8)}...</div>
           )}
         </div>
       </div>
 
-      {/* Wager - ERC-20 only */}
+      {/* Wager */}
       {hasWager && (
         <div style={{
           textAlign: 'center',
@@ -199,7 +153,7 @@ export default function GameView({ gameId, contractAddress, onClose }: GameViewP
           letterSpacing: '0.1em'
         }}>
           <span className="text-neon-cyan">WAGER:</span> {formatEther(gameData.wagerAmount)}{' '}
-          <span className="text-neon-purple">{isNativeWager ? 'sFUEL' : 'ERC-20'}</span>
+          <span className="text-neon-purple">SKL</span>
         </div>
       )}
 
@@ -213,47 +167,20 @@ export default function GameView({ gameId, contractAddress, onClose }: GameViewP
         </div>
       )}
 
-      {/* Reveal Section */}
-      {isPlayer && gameData.state === 1 && !hasRevealed && (
-        <div className="reveal-section stagger-in">
-          <h3>// REVEAL YOUR MOVE</h3>
-          <p style={{ color: 'hsla(180, 100%, 80%, 0.8)', marginBottom: '1rem' }}>
-            Enter your secret nonce to decrypt your move:
-          </p>
-          <div className="form-group">
-            <input
-              type="text"
-              placeholder="Enter your secret nonce"
-              value={nonce}
-              onChange={(e) => setNonce(e.target.value)}
-            />
-          </div>
-          <button
-            className="action-btn"
-            onClick={handleReveal}
-            disabled={!nonce || isRevealingMove}
-          >
-            {isRevealingMove ? '[ REVEALING... ]' : '[ REVEAL MOVE ]'}
-          </button>
-        </div>
-      )}
-
-      {/* Claim Timeout */}
+      {/* BITE Info */}
       {gameData.state !== 3 && gameData.state !== 4 && (
-        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-          <button
-            className="action-btn"
-            onClick={handleClaimTimeout}
-            disabled={isClaiming}
-            style={{
-              background: 'linear-gradient(135deg, hsla(320, 100%, 60%, 0.3), hsla(320, 100%, 60%, 0.2))',
-              border: '1px solid hsla(320, 100%, 60%, 0.4)'
-            }}
-          >
-            {isClaiming ? '[ PROCESSING... ]' : '[ CLAIM TIMEOUT ]'}
-          </button>
-          <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.5rem', fontFamily: 'JetBrains Mono' }}>
-            Execute if opponent exceeds time limit
+        <div style={{
+          marginTop: '2rem',
+          padding: '1.25rem',
+          background: 'linear-gradient(135deg, hsla(180, 100%, 50%, 0.08), hsla(280, 70%, 55%, 0.08))',
+          borderRadius: '10px',
+          border: '1px dashed hsla(180, 100%, 50%, 0.3)',
+          textAlign: 'center'
+        }}>
+          <p style={{ fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: 'hsla(180, 100%, 70%, 0.8)', lineHeight: '1.6' }}>
+            <span className="text-neon-cyan"><Zap size={14} style={{ verticalAlign: 'middle' }} /></span> Moves encrypted via BITE protocol<br />
+            <span className="text-neon-cyan"><Zap size={14} style={{ verticalAlign: 'middle' }} /></span> CTX auto-decrypts in next block<br />
+            <span className="text-neon-cyan"><Zap size={14} style={{ verticalAlign: 'middle' }} /></span> No manual reveal required
           </p>
         </div>
       )}

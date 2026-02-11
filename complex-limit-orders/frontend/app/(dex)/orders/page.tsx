@@ -27,8 +27,8 @@ export default function OrdersPage() {
 
         {/* Right: Live Price Feed (top) + Orders (bottom) */}
         <div className="flex flex-col min-h-0 gap-4">
-          {/* Top: Live Price Feed */}
-          <div className="min-h-[200px]">
+          {/* Top: Live Price Feed - constrained height with scroll */}
+          <div className="max-h-[45%] min-h-[200px] flex flex-col">
             <PoolPriceTicker />
           </div>
 

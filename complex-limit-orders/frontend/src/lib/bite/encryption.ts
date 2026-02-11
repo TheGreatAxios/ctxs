@@ -14,6 +14,7 @@ const MAX_DATA_SIZE = 64 * 1024; // 64KB max for BITE encryption
 export async function encryptTE(
   data: Uint8Array,
   rpcUrl: string,
+  contractAddress: string,
 ): Promise<`0x${string}`> {
   if (data.length > MAX_DATA_SIZE) {
     throw new Error(
@@ -23,7 +24,7 @@ export async function encryptTE(
 
   const bite = new BITE(rpcUrl);
   const hexMessage = toHex(data);
-  const encrypted = await bite.encryptMessage(hexMessage);
+  const encrypted = await bite.encryptMessageForCTX(hexMessage, contractAddress);
   return encrypted as `0x${string}`;
 }
 
@@ -38,8 +39,9 @@ export async function encryptTE(
 export async function encryptAmount(
   amount: bigint,
   rpcUrl: string,
+  contractAddress: string,
 ): Promise<{ thresholdEncrypted: `0x${string}` }> {
   const amountBytes = toBytes(amount);
-  const thresholdEncrypted = await encryptTE(amountBytes, rpcUrl);
+  const thresholdEncrypted = await encryptTE(amountBytes, rpcUrl, contractAddress);
   return { thresholdEncrypted };
 }
