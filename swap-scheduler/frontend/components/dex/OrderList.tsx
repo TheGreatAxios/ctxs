@@ -6,8 +6,6 @@ import Link from "next/link";
 import { useChainOrders } from "@/lib/hooks/useChainOrders";
 import { useCancelLimitOrder } from "@/lib/hooks/useLimitOrders";
 import { Badge } from "@/components/ui/Badge";
-import { CONTRACTS } from "@/config/contracts";
-import { skaleCtxChain } from "@/wagmi";
 import { useContracts } from "@/config/contracts";
 
 // All keys lowercase for consistent matching
@@ -62,19 +60,19 @@ export function OrderList() {
   const contracts = useContracts();
   const { orders, isLoading } = useChainOrders(
     address,
-    chainId ?? skaleCtxChain.id,
+    chainId ?? 103698795,
     Object.values(contracts?.pairs ?? {}).filter(Boolean),
   );
-  const { cancelOrder, isPending, isConfirming } = useCancelLimitOrder();
+  const { cancelSwap, isPending, isConfirming } = useCancelLimitOrder();
 
   const activeOrders = orders.filter((order) => order.active);
 
-  const handleCancel = async (pool: string, orderId: bigint) => {
+  const handleCancel = async (pool: string, swapId: bigint) => {
     try {
-      await cancelOrder(
-        contracts?.limitOrderBook ?? CONTRACTS.limitOrderBook,
+      await cancelSwap(
+        contracts?.scheduledSwapBook,
         pool as `0x${string}`,
-        orderId,
+        swapId,
       );
     } catch (error) {
       console.error("Failed to cancel order:", error);
@@ -120,7 +118,7 @@ export function OrderList() {
       <div className="overflow-y-auto flex-1 divide-y divide-stone-200">
         {activeOrders.map((order) => (
           <div
-            key={`${order.pool}-${order.orderId}`}
+            key={`${order.pool}-${order.swapId}`}
             className="px-3 py-2 hover:bg-stone-50 transition-colors flex items-center gap-3"
           >
             {/* Pool Name */}
@@ -169,7 +167,7 @@ export function OrderList() {
 
             {/* Explorer Link */}
             <a
-              href={`${skaleCtxChain.blockExplorers.default.url}/address/${order.pool}`}
+              href={`https://base-sepolia-testnet-explorer.skalenodes.com:10032/address/${order.pool}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-stone-400 hover:text-accent transition-colors shrink-0"
@@ -180,7 +178,7 @@ export function OrderList() {
 
             {/* Cancel Button */}
             <button
-              onClick={() => handleCancel(order.pool, order.orderId)}
+              onClick={() => handleCancel(order.pool, order.swapId)}
               disabled={isPending || isConfirming}
               className="shrink-0 bg-error/10 hover:bg-error/20 disabled:bg-stone-100 disabled:cursor-not-allowed text-error border border-error rounded p-1 transition-all hover:shadow-[1px_1px_0_0_#000] active:shadow-none active:translate-y-[1px] active:translate-x-[1px]"
               title="Cancel order"

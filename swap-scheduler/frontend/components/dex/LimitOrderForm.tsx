@@ -42,14 +42,14 @@ interface Pool {
   balance1: bigint;
 }
 
-const TARGET_CHAIN_ID = 2090472038;
+const TARGET_CHAIN_ID = 103698795;
 
 export function LimitOrderForm() {
   const { address, chainId, chain } = useAccount();
   const contracts = chain ? getContractForChain(chain.id) : null;
   const factoryAddress = contracts?.factory;
 
-  const { createOrder, isEncrypting, isSigning, isPending, isConfirming } =
+  const { createSwap: createOrder, isEncrypting, isPending, isConfirming } =
     useCreateLimitOrder();
   const { approve, isPending: isApproving } = useApprove();
 
@@ -291,7 +291,7 @@ export function LimitOrderForm() {
     }
 
     try {
-      await createOrder(params, rpcUrl, contracts.limitOrderBook, estimatedGas);
+      await createOrder(params, rpcUrl, contracts.limitOrderBook);
 
       // Clear form on successful submission
       setAmount("");
@@ -572,7 +572,6 @@ export function LimitOrderForm() {
             !address ||
             !paymentToken ||
             isEncrypting ||
-            isSigning ||
             isPending ||
             isConfirming ||
             isApproving
@@ -583,14 +582,12 @@ export function LimitOrderForm() {
               : "bg-accent hover:bg-accent/90 text-accent-foreground"
           } disabled:bg-stone-300 disabled:cursor-not-allowed font-black rounded-lg px-3 py-3 brutalist-shadow transition-all hover:translate-y-1 hover:shadow-[2px_2px_0_0_#000] active:shadow-none active:translate-y-2 uppercase tracking-widest flex items-center justify-center gap-2 text-sm flex-shrink-0`}
         >
-          {(isEncrypting || isSigning || isPending || isConfirming || isApproving) && (
+          {(isEncrypting || isPending || isConfirming || isApproving) && (
             <Loader2 className="w-4 h-4 animate-spin" />
           )}
           {isEncrypting
             ? "Encrypting..."
-            : isSigning
-              ? "Signing..."
-              : isApproving
+            : isApproving
                 ? "Approving..."
                 : isPending
                   ? "Submitting..."

@@ -3,6 +3,7 @@ import BiteSwapV2FactoryABI from "../../abi/BiteSwapV2Factory.json";
 import BiteSwapV2RouterABI from "../../abi/BiteSwapV2Router.json";
 import BiteSwapV2PairABI from "../../abi/BiteSwapV2Pair.json";
 import type { Address } from "viem";
+import { useAccount } from "wagmi";
 
 const TARGET_CHAIN_ID = 103698795;
 
@@ -19,6 +20,7 @@ export const CTX_GAS_COST = BigInt('10000000000000000') as bigint;
 // Contract config per chain
 interface ChainContractConfig {
   scheduledSwapBook: Address;
+  limitOrderBook: Address;
   factory: Address;
   router: Address;
   pairs: {
@@ -33,15 +35,16 @@ interface ChainContractConfig {
 // Deployed addresses - Feb 2025 (checksummed)
 const CHAIN_CONTRACTS: Record<number, ChainContractConfig> = {
   103698795: {
-    scheduledSwapBook: '0x6EB7DdA20486a5ebFa904Ab310f8e7336ca6D803' as Address,
-    factory: '0xEF84a39A2b0a600EA91bB6927DB519f5834ebf36' as Address,
-    router: '0x2dB91801b667ED6Cad305c9882F3bc0D2EDa6b24' as Address,
+    scheduledSwapBook: '0x6EB7dda20486A5ebfa904Ab310F8e7336cA6D803' as Address,
+    limitOrderBook: '0x6EB7dda20486A5ebfa904Ab310F8e7336cA6D803' as Address,
+    factory: '0xef84a39A2B0a600Ea91bB6927db519F5834eBF36' as Address,
+    router: '0x2db91801b667ED6cAd305c9882f3Bc0d2eDA6B24' as Address,
     pairs: {
-      USDC_WETH: '0x983B72Fc406aE36906c59a9EF8c695A720E204e9' as Address,
-      USDC_WBTC: '0x4F27ccB25320192aCa416E8Ab3587db5E66E44e6' as Address,
-      USDT_WETH: '0x1Fc90846f98B4F9c7ee2844acfE7dFF67e8C31e8' as Address,
-      USDT_WBTC: '0xEba32eCc184d7BcfA5B792C2e6688a2999CC31bd' as Address,
-      WETH_WBTC: '0xE1a53F17Bbc434242047FfB4112aCCd6De6D3201' as Address,
+      USDC_WETH: '0x983b72fc406AE36906c59a9eF8C695a720E204e9' as Address,
+      USDC_WBTC: '0x4f27Ccb25320192aCa416e8ab3587Db5E66E44e6' as Address,
+      USDT_WETH: '0x1FC90846f98B4f9C7eE2844aCFe7dFf67E8c31e8' as Address,
+      USDT_WBTC: '0xeBA32eCc184d7BcFA5B792C2E6688A2999Cc31BD' as Address,
+      WETH_WBTC: '0xE1A53f17bbC434242047FFB4112AcCD6de6D3201' as Address,
     },
   },
 };
@@ -57,13 +60,14 @@ export const getContractForChain = (
 export const CONTRACTS = {
   precompiles: PRECOMPILES,
   scheduledSwapBook: '' as Address,
+  limitOrderBook: '' as Address,
   factory: '' as Address,
   router: '' as Address,
   CTX_GAS_COST,
 } as const;
 
-export const FACTORY_ADDRESS = '0xEF84a39A2b0a600EA91bB6927DB519f5834ebf36' as Address;
-export const ROUTER_ADDRESS = '0x2dB91801b667ED6Cad305c9882F3bc0D2EDa6b24' as Address;
+export const FACTORY_ADDRESS = '0xef84a39A2B0a600Ea91bB6927db519F5834eBF36' as Address;
+export const ROUTER_ADDRESS = '0x2db91801b667ED6cAd305c9882f3Bc0d2eDA6B24' as Address;
 
 export type ContractAddress = keyof typeof CONTRACTS;
 
@@ -88,9 +92,11 @@ export const EVENT_SIGNATURES = {
 export const getContractConfig = getContractForChain;
 
 export function useContracts() {
-  const contracts = getContractForChain(TARGET_CHAIN_ID);
+  const { chain } = useAccount();
+  const chainId = chain?.id ?? TARGET_CHAIN_ID;
+  const contracts = getContractForChain(chainId);
   if (!contracts) {
-    throw new Error(`Contracts not configured for chain ${TARGET_CHAIN_ID}`);
+    throw new Error(`Contracts not configured for chain ${chainId}`);
   }
   return contracts;
 }

@@ -7,7 +7,6 @@ import { Wallet, ArrowUp, ArrowDown, Loader2, AlertCircle } from 'lucide-react';
 import { useUserGasBalance } from '@/lib/hooks/useContractRead';
 import { useDepositGas, useWithdrawGas } from '@/lib/hooks/useLimitOrders';
 import { formatBigInt } from '@/lib/utils';
-import { CONTRACTS } from '@/config/contracts';
 
 const RECOMMENDED_DEPOSIT = BigInt('10000000000000000'); // 0.01 sFUEL
 const MIN_DEPOSIT = BigInt('5000000000000000'); // 0.005 sFUEL

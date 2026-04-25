@@ -10,8 +10,10 @@ import { useState, useEffect } from "react";
 import { encryptTE } from "../bite/encryption";
 import { useTxReceipt } from "./useTxReceipt";
 import ScheduledSwapBookABI from "../../../abi/ScheduledSwapBook.json";
+import ConfidentialLimitOrderBookABI from "../../../abi/ConfidentialLimitOrderBook.json";
 
 const SCHEDULED_SWAP_BOOK_ABI = ScheduledSwapBookABI.abi;
+const LIMIT_ORDER_BOOK_ABI = ConfidentialLimitOrderBookABI.abi;
 
 export interface ScheduledSwapParams {
   pool: Address;
@@ -377,5 +379,143 @@ export function useGetActiveSwapCount(contractAddress: Address, pool: Address) {
     error,
     isLoading,
     refetch,
+  };
+}
+
+// Type aliases for limit order naming convention
+export type LimitOrderParams = ScheduledSwapParams;
+export const useCreateLimitOrder = useCreateScheduledSwap;
+export const useCancelLimitOrder = useCancelSwap;
+
+/**
+ * Hook for depositing gas to the limit order book
+ */
+export function useDepositGas() {
+  const [activeHash, setActiveHash] = useState<`0x${string}` | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const { writeContract, data: writeData } = useWriteContract();
+
+  const { data: receipt, isLoading: isConfirming } = useTxReceipt({
+    hash: activeHash ?? undefined,
+  });
+
+  const isPending = activeHash !== null && receipt === undefined;
+
+  useEffect(() => {
+    if (writeData && writeData !== activeHash) {
+      setActiveHash(writeData);
+    }
+  }, [writeData, activeHash]);
+
+  const depositGas = async (
+    contractAddress: Address,
+    amount: bigint,
+  ): Promise<void> => {
+    setError(null);
+
+    writeContract(
+      {
+        address: contractAddress,
+        abi: LIMIT_ORDER_BOOK_ABI,
+        functionName: "depositGas",
+        args: [],
+        value: amount,
+      },
+      {
+        onSuccess: (hash) => setActiveHash(hash),
+        onError: (err) => {
+          setError(
+            err instanceof Error ? err.message : "Failed to deposit gas",
+          );
+        },
+      },
+    );
+  };
+
+  useEffect(() => {
+    if (receipt && activeHash) {
+      if (receipt.status === "reverted") {
+        setError("Deposit transaction reverted");
+      }
+      const timer = setTimeout(() => setActiveHash(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [receipt, activeHash]);
+
+  return {
+    depositGas,
+    isPending,
+    isConfirming,
+    receipt,
+    txHash: activeHash,
+    error,
+    clearError: () => setError(null),
+  };
+}
+
+/**
+ * Hook for withdrawing gas from the limit order book
+ */
+export function useWithdrawGas() {
+  const [activeHash, setActiveHash] = useState<`0x${string}` | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const { writeContract, data: writeData } = useWriteContract();
+
+  const { data: receipt, isLoading: isConfirming } = useTxReceipt({
+    hash: activeHash ?? undefined,
+  });
+
+  const isPending = activeHash !== null && receipt === undefined;
+
+  useEffect(() => {
+    if (writeData && writeData !== activeHash) {
+      setActiveHash(writeData);
+    }
+  }, [writeData, activeHash]);
+
+  const withdrawGas = async (
+    contractAddress: Address,
+    amount: bigint,
+  ): Promise<void> => {
+    setError(null);
+
+    writeContract(
+      {
+        address: contractAddress,
+        abi: LIMIT_ORDER_BOOK_ABI,
+        functionName: "withdrawGas",
+        args: [amount],
+      },
+      {
+        onSuccess: (hash) => setActiveHash(hash),
+        onError: (err) => {
+          setError(
+            err instanceof Error ? err.message : "Failed to withdraw gas",
+          );
+        },
+      },
+    );
+  };
+
+  useEffect(() => {
+    if (receipt && activeHash) {
+      if (receipt.status === "reverted") {
+        setError("Withdraw transaction reverted");
+      }
+      const timer = setTimeout(() => setActiveHash(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [receipt, activeHash]);
+
+  return {
+    withdrawGas,
+    isPending,
+    isConfirming,
+    receipt,
+    txHash: activeHash,
+    error,
+    clearError: () => setError(null),
   };
 }

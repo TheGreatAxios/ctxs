@@ -14,7 +14,7 @@ import { useAccount } from "wagmi";
 
 export function PoolList() {
   const { chain } = useAccount();
-  const contracts = getContractForChain(chain?.id ?? 2090472038);
+  const contracts = getContractForChain(chain?.id ?? 103698795);
 
   if (!contracts) {
     return (

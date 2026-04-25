@@ -24,7 +24,7 @@ interface SwapFormProps {
   availableTokens?: TokenInfo[];
 }
 
-const TARGET_CHAIN_ID = 2090472038;
+const TARGET_CHAIN_ID = 103698795;
 
 // Safe number formatter to handle NaN
 const safeFixed = (value: number | null | undefined, decimals: number): string => {
